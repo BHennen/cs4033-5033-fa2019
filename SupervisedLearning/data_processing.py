@@ -3,10 +3,10 @@ import numpy as np
 
 class DataProcessor():
     def __init__(self, data_file_path, processed_data_folder, processed_data_filename="processed_data.npz"):
-        self.data_file_path = data_file_path
-        self.processed_data_folder = processed_data_folder
-        self.processed_data_filename = processed_data_filename
-        self.processed_data_path = os.path.join(self.processed_data_folder, self.processed_data_filename)
+        self._data_file_path = data_file_path
+        self._processed_data_folder = processed_data_folder
+        self._processed_data_filename = processed_data_filename
+        self._processed_data_path = os.path.join(self._processed_data_folder, self._processed_data_filename)
 
     def check_if_processed(self):
         # Checks for already processed data
@@ -18,7 +18,7 @@ class DataProcessor():
     def load_processed_data(self):
         #Loads already processed data
         if self.check_if_processed():
-            with np.load(self.processed_data_path) as data:
+            with np.load(self._processed_data_path) as data:
                 self.test_X = data['test_X']
                 self.test_y = data['test_y']
                 self.training_X = data['training_X']
@@ -41,8 +41,8 @@ class DataProcessor():
         if os.path.exists(self.data_file_path):
             #Process data
             ##TODO: update function to match format of data file
-            data = np.genfromtxt(self.data_file_path)
-            #TODO: may have to rearrange target and predictor columns so that predictor columns are on the end
+            data = np.genfromtxt(self._data_file_path)
+            #TODO: We might have to make our own predictor columns
 
             #Shuffle data
             np.random.shuffle(data)
@@ -66,10 +66,11 @@ class DataProcessor():
             validation_X = 
             validation_y = 
 
-            # Normalize each predictor variable. TODO: (Based on homework 7) not sure if this is needed
+            ## Normalize each predictor variable. TODO: (Based on homework 7) not sure if this is needed 
+            # Get mean and standard deviation for each predictor
             validation_train_mean = np.mean(validation_train_X, axis=0)
             validation_train_sd = np.std(validation_train_X, axis=0)
-            #calculate z-score for each datum
+            # calculate z-score for each datum
             for row_index, row in enumerate(test_X):
                 for col_index, val in enumerate(row):
                     normalized_val = (val - validation_train_mean[col_index]) / validation_train_sd[col_index]
@@ -91,7 +92,7 @@ class DataProcessor():
             self.validation_X = validation_X
             self.validation_y = validation_y
 
-            np.savez(self.data_file_path, test_X = test_X, test_y = test_y, training_X = training_X, 
+            np.savez(self._data_file_path, test_X = test_X, test_y = test_y, training_X = training_X, 
                      training_y = training_y, validation_X = validation_X, validation_y = validation_y)
 
         else:
