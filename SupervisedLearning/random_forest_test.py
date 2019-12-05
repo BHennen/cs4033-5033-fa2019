@@ -11,8 +11,11 @@ if __name__ == "__main__":
     data_file_path = os.path.join(processed_data_folder, "train.csv") 
     data = DataProcessor(data_file_path, processed_data_folder)
 
-    if data.check_if_processed():
+    try:
+        #Try to load data
         data.load_processed_data()
-    else:
+    except FileNotFoundError:
+        #No data found, so process it
         data.process_data((0.1, 0.1, 0.8))  # 10% test, 10% validation, 80% training samples from data
 
+    

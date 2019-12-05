@@ -20,6 +20,7 @@ class DataProcessor():
     def load_processed_data(self):
         # Loads already processed data
         if self.check_if_processed():
+            print(f"Loading preprocessed data, if you want to process again, delete: {self._processed_data_path}")
             with np.load(self._processed_data_path) as data:
                 self.test_X = data['test_X']
                 self.test_y = data['test_y']
@@ -28,7 +29,7 @@ class DataProcessor():
                 self.validation_X = data['validation_X']
                 self.validation_y = data['validation_y']
         else:
-            raise FileNotFoundError(f"Data not processed yet; no file found at:{self.processed_data_path}")
+            raise FileNotFoundError(f"Data not processed yet; no file found at: {self._processed_data_path}")
 
     def process_data(self, splits):
         '''
@@ -42,7 +43,8 @@ class DataProcessor():
         # Process data for the first time
         if os.path.exists(self._data_file_path):
             # Process data
-
+            print(f"Processing data: {self._data_file_path}")
+            
             # Only use certain columns
             use_cols = (  # 0, #PassengerID
                         1,  # Survived
@@ -103,12 +105,12 @@ class DataProcessor():
             # Remove target columns from dataset and save them for later
             # *_X = only predictors for the data
             # *_y = only target columns for the data
-            test_X = np.delete(test_data, 1, 1)  # delete target column
-            test_y = test_data[:, 1]  # Only use target column
-            training_X = np.delete(training_data, 1, 1)  # delete target column
-            training_y = training_data[:, 1]  # Only use target column
-            validation_X = np.delete(validation_data, 1, 1)  # delete target column
-            validation_y = validation_data[:, 1]  # Only use target column
+            test_X = np.delete(test_data, 0, 1)  # delete target column
+            test_y = test_data[:, 0]  # Only use target column
+            training_X = np.delete(training_data, 0, 1)  # delete target column
+            training_y = training_data[:, 0]  # Only use target column
+            validation_X = np.delete(validation_data, 0, 1)  # delete target column
+            validation_y = validation_data[:, 0]  # Only use target column
 
             # Save *_X and *_y data
             self.test_X = test_X
@@ -118,7 +120,8 @@ class DataProcessor():
             self.validation_X = validation_X
             self.validation_y = validation_y
 
-            np.savez(self._data_file_path, test_X=test_X, test_y=test_y, training_X=training_X,
+            print(f"Saving processed data to: {self._processed_data_path}")
+            np.savez(self._processed_data_path, test_X=test_X, test_y=test_y, training_X=training_X,
                      training_y=training_y, validation_X=validation_X, validation_y=validation_y)
 
         else:
