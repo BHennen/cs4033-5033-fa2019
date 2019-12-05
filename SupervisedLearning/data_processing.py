@@ -1,5 +1,7 @@
 import os
 import numpy as np
+from csv import reader
+
 
 class DataProcessor():
     def __init__(self, data_file_path, processed_data_folder, processed_data_filename="processed_data.npz"):
@@ -10,14 +12,15 @@ class DataProcessor():
 
     def check_if_processed(self):
         # Checks for already processed data
-        if os.path.exists(self.processed_data_path):
+        if os.path.exists(self._processed_data_path):
             return True
         else:
             return False
-    
+
     def load_processed_data(self):
-        #Loads already processed data
+        # Loads already processed data
         if self.check_if_processed():
+            print(f"Loading preprocessed data, if you want to process again, delete: {self._processed_data_path}")
             with np.load(self._processed_data_path) as data:
                 self.test_X = data['test_X']
                 self.test_y = data['test_y']
@@ -26,8 +29,8 @@ class DataProcessor():
                 self.validation_X = data['validation_X']
                 self.validation_y = data['validation_y']
         else:
-            raise FileNotFoundError(f"Data not processed yet; no file found at:{self.processed_data_path}")
-                
+            raise FileNotFoundError(f"Data not processed yet; no file found at: {self._processed_data_path}")
+
     def process_data(self, splits):
         '''
         splits: 3-tuple of floats which adds to 1, which is the proportion of data that will be allocated to
@@ -37,53 +40,78 @@ class DataProcessor():
         if sum(splits) != 1:
             raise ArithmeticError("process_data: splits does not add to 1")
 
-        #Process data for the first time
-        if os.path.exists(self.data_file_path):
-            #Process data
-            ##TODO: update function to match format of data file
-            data = np.genfromtxt(self._data_file_path)
-            #TODO: We might have to make our own predictor columns
+        # Process data for the first time
+        if os.path.exists(self._data_file_path):
+            # Process data
+            print(f"Processing data: {self._data_file_path}")
+            
+            # Only use certain columns
+            use_cols = (  # 0, #PassengerID
+                        1,  # Survived
+                        2,  # Pclass
+                        # 3, #Name
+                        4,  # Sex
+                        5,  # Age
+                        6,  # SibSp
+                        7,  # Parch
+                        # 8, #Ticket
+                        9,  # Fare
+                        # 10, #Cabin
+                        11,  # Embarked
+            )
+            # Convert certain columns to float values (so we can use numpy arrays)
+            converters = {4: lambda sex: {'male':0.0, 'female':1.0}[sex],
+                          11: lambda embarked: {'S': 0.0, 'C': 1.0, 'Q': 2.0}[embarked]}
+            data = []
+            with open(self._data_file_path) as data_file:
+                for line_no, line in enumerate(reader(data_file)):
+                    if line_no < 1:
+                        continue
+                    # Iterate through columns, skipping those we dont want, and converting others
+                    cols = []
+                    for index, col in enumerate(line):
+                        if index not in use_cols:
+                            continue
+                        if col == '':
+                            # Default value for no data
+                            cols.append(None)
+                        elif index in converters:
+                            # Try checking for converter
+                            cols.append(converters[index](col))
+                        else:
+                            #Try converting to float
+                            try:
+                                cols.append(float(col))
+                            except ValueError as e:
+                                print("Default conversion to float did not work.")
+                                raise e
+                    
+                    data.append(cols)
+            
+            data = np.array(data, dtype=np.float_)
 
-            #Shuffle data
+            # Shuffle data
             np.random.shuffle(data)
 
-            #Split into test and validation combined with training data
+            # Split into test and validation combined with training data
             len_test_data = int(len(data) * splits[0])
             test_data = data[0:len_test_data]
             validation_train_data = data[len_test_data:]
-            ## Split remaing into validation and training
+            # Split remaing into validation and training
             len_validation_data = int(len(data) * splits[1])
             validation_data = validation_train_data[0:len_validation_data]
             training_data = validation_train_data[len_validation_data:]
 
-            # TODO: Remove target columns from dataset and save them for later
+            # Remove target columns from dataset and save them for later
             # *_X = only predictors for the data
             # *_y = only target columns for the data
-            test_X =
-            test_y = 
-            training_X = 
-            training_y = 
-            validation_X = 
-            validation_y = 
+            test_X = np.delete(test_data, 0, 1)  # delete target column
+            test_y = test_data[:, 0]  # Only use target column
+            training_X = np.delete(training_data, 0, 1)  # delete target column
+            training_y = training_data[:, 0]  # Only use target column
+            validation_X = np.delete(validation_data, 0, 1)  # delete target column
+            validation_y = validation_data[:, 0]  # Only use target column
 
-            ## Normalize each predictor variable. TODO: (Based on homework 7) not sure if this is needed 
-            # Get mean and standard deviation for each predictor
-            validation_train_mean = np.mean(validation_train_X, axis=0)
-            validation_train_sd = np.std(validation_train_X, axis=0)
-            # calculate z-score for each datum
-            for row_index, row in enumerate(test_X):
-                for col_index, val in enumerate(row):
-                    normalized_val = (val - validation_train_mean[col_index]) / validation_train_sd[col_index]
-                    test_X[row_index, col_index] = normalized_val
-            for row_index, row in enumerate(training_X):
-                for col_index, val in enumerate(row):
-                    normalized_val = (val - validation_train_mean[col_index]) / validation_train_sd[col_index]
-                    training_X[row_index, col_index] = normalized_val
-            for row_index, row in enumerate(validation_X):
-                for col_index, val in enumerate(row):
-                    normalized_val = (val - validation_train_mean[col_index]) / validation_train_sd[col_index]
-                    validation_X[row_index, col_index] = normalized_val
-            
             # Save *_X and *_y data
             self.test_X = test_X
             self.test_y = test_y
@@ -92,10 +120,9 @@ class DataProcessor():
             self.validation_X = validation_X
             self.validation_y = validation_y
 
-            np.savez(self._data_file_path, test_X = test_X, test_y = test_y, training_X = training_X, 
-                     training_y = training_y, validation_X = validation_X, validation_y = validation_y)
+            print(f"Saving processed data to: {self._processed_data_path}")
+            np.savez(self._processed_data_path, test_X=test_X, test_y=test_y, training_X=training_X,
+                     training_y=training_y, validation_X=validation_X, validation_y=validation_y)
 
         else:
-            raise FileNotFoundError(f"No data at path specified:{self.data_file_path}")
-       
-
+            raise FileNotFoundError(f"No data at path specified:{self._data_file_path}")
