@@ -59,30 +59,12 @@ class DataProcessor():
             # TODO: Remove target columns from dataset and save them for later
             # *_X = only predictors for the data
             # *_y = only target columns for the data
-            test_X =
-            test_y = 
-            training_X = 
-            training_y = 
-            validation_X = 
-            validation_y = 
-
-            ## Normalize each predictor variable. TODO: (Based on homework 7) not sure if this is needed 
-            # Get mean and standard deviation for each predictor
-            validation_train_mean = np.mean(validation_train_X, axis=0)
-            validation_train_sd = np.std(validation_train_X, axis=0)
-            # calculate z-score for each datum
-            for row_index, row in enumerate(test_X):
-                for col_index, val in enumerate(row):
-                    normalized_val = (val - validation_train_mean[col_index]) / validation_train_sd[col_index]
-                    test_X[row_index, col_index] = normalized_val
-            for row_index, row in enumerate(training_X):
-                for col_index, val in enumerate(row):
-                    normalized_val = (val - validation_train_mean[col_index]) / validation_train_sd[col_index]
-                    training_X[row_index, col_index] = normalized_val
-            for row_index, row in enumerate(validation_X):
-                for col_index, val in enumerate(row):
-                    normalized_val = (val - validation_train_mean[col_index]) / validation_train_sd[col_index]
-                    validation_X[row_index, col_index] = normalized_val
+            test_X = np.delete(test_data, 1, 1)  # delete target column
+            test_y = test_data[:, 1]  # Only use target column
+            training_X = np.delete(training_data, 1, 1)  # delete target column
+            training_y = training_data[:, 1]  # Only use target column
+            validation_X = np.delete(validation_data, 1, 1)  # delete target column
+            validation_y = validation_data[:, 1]  # Only use target column
             
             # Save *_X and *_y data
             self.test_X = test_X
