@@ -119,15 +119,15 @@ class DataProcessor():
             train_valid_sd = np.nanstd(validation_train_X, axis=0)
             #calculate z-score for each datum
             for row_index, row in enumerate(test_X):
-                for col_index, val in enumerate(row[:-1]):  # ignore last column which is target
+                for col_index, val in enumerate(row):
                     normalized_val = (val - train_valid_mean[col_index]) / train_valid_sd[col_index]
                     test_X[row_index, col_index] = normalized_val
             for row_index, row in enumerate(training_X):
-                for col_index, val in enumerate(row[:-1]):  # ignore last column which is target
+                for col_index, val in enumerate(row):
                     normalized_val = (val - train_valid_mean[col_index]) / train_valid_sd[col_index]
                     training_X[row_index, col_index] = normalized_val
             for row_index, row in enumerate(validation_X):
-                for col_index, val in enumerate(row[:-1]):  # ignore last column which is target
+                for col_index, val in enumerate(row):
                     normalized_val = (val - train_valid_mean[col_index]) / train_valid_sd[col_index]
                     validation_X[row_index, col_index] = normalized_val
 
