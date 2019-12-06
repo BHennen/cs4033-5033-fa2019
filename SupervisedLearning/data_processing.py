@@ -97,6 +97,7 @@ class DataProcessor():
             len_test_data = int(len(data) * splits[0])
             test_data = data[0:len_test_data]
             validation_train_data = data[len_test_data:]
+            validation_train_X = np.delete(validation_train_data, 0, 1) #Delete target column
             # Split remaing into validation and training
             len_validation_data = int(len(data) * splits[1])
             validation_data = validation_train_data[0:len_validation_data]
@@ -111,6 +112,24 @@ class DataProcessor():
             training_y = training_data[:, 0]  # Only use target column
             validation_X = np.delete(validation_data, 0, 1)  # delete target column
             validation_y = validation_data[:, 0]  # Only use target column
+
+            ## Normalize predictor data
+            #Get mean and standard deviation of each column (except the last)
+            train_valid_mean = np.nanmean(validation_train_X, axis=0)
+            train_valid_sd = np.nanstd(validation_train_X, axis=0)
+            #calculate z-score for each datum
+            for row_index, row in enumerate(test_X):
+                for col_index, val in enumerate(row[:-1]):  # ignore last column which is target
+                    normalized_val = (val - train_valid_mean[col_index]) / train_valid_sd[col_index]
+                    test_X[row_index, col_index] = normalized_val
+            for row_index, row in enumerate(training_X):
+                for col_index, val in enumerate(row[:-1]):  # ignore last column which is target
+                    normalized_val = (val - train_valid_mean[col_index]) / train_valid_sd[col_index]
+                    training_X[row_index, col_index] = normalized_val
+            for row_index, row in enumerate(validation_X):
+                for col_index, val in enumerate(row[:-1]):  # ignore last column which is target
+                    normalized_val = (val - train_valid_mean[col_index]) / train_valid_sd[col_index]
+                    validation_X[row_index, col_index] = normalized_val
 
             # Save *_X and *_y data
             self.test_X = test_X
