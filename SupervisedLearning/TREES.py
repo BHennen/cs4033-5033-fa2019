@@ -1,5 +1,6 @@
 import math
 import numpy as np
+from collections import defaultdict
 
 class RandomForestClassifier():
     ''' A random forest classifier using GINI impurity for the decision tree split criterion.
@@ -62,7 +63,7 @@ class RandomForestClassifier():
         '''
         # update max_features to be ⌊√p⌋ if it is == "auto"
         if self.max_features == "auto":
-            self.max_features = X.shape[1]**0.5 # Num features is how many columns there are in dataset
+            self.max_features = int(X.shape[1]**0.5)  # Num features is how many columns there are in dataset
         
         sample_size = X.shape[0] # num rows in predictor data
 
@@ -90,13 +91,6 @@ class DecisionTreeClassifier():
     '''
     Build a decision tree using the GINI impurity as its criterion for splitting.
 
-    Pseudocode:
-    for node in internal_nodes:
-        vals, counts = np.unique(y, return_counts=True)
-        ps = counts/len(y)
-        gini = 1-sum(ps**2)
-        for feature in features:
-
     Parameters
     ----------
     min_node_size : integer, optional (default=1)
@@ -123,22 +117,110 @@ class DecisionTreeClassifier():
         else:
             self.rand_state = np.random.RandomState(seed=random_seed)
     
-    def fit(self, X, y, X_sorted_idx=None):
+    def fit(self, X, y, sample_indices=None, X_sorted_idx=None):
         '''
         Fit data X to target values in y using decision tree classifier.
 
         Parameters
         ----------
         X : numpy array
-        y : numpy array
+        y : 1d numpy array (does not work for multiple feature target (yet?))
+        sample_indices: Only use these indices when building the tree (repeats allowed)
+        X_sorted_idx: The indices of X where each column is sorted. 
+            idx = X_sorted_idx[1,0] will give the index in X which is the second lowest value for feature(column) 0
+            X[idx] will give the second lowest value for feature(column) 0
         '''
 
         # Sort each column of X and save sorted indices in 2d array
         if X_sorted_idx is None:
             X_sorted_idx = np.argsort(X, axis=0)
         
-        
+        # update max_features to be ⌊√p⌋ if it is == "auto"
+        if self.max_features == "auto":
+            self.max_features = int(X.shape[1]**0.5)  # Num features is how many columns there are in dataset
+        if self.max_features > X.shape[1]:
+            raise IndexError("Max features is more than number of features in the data.")
+
+        # init node
+        root_node = DecisionTreeNode(parent=None, GINI_impurity=DecisionTreeNode.calc_GINI_impurity(y))
+        nodes = [root_node]
+        # Loop through nodes, splitting them until we've turned all nodes into nodes that can't be split anymore
+        while nodes:
+            node = nodes.pop()
+            new_nodes = node.split(X, y, self.max_features, self.rand_state)
+            for new_node in new_nodes:
+                nodes.append(new_node)
+        #TODO: Done creating all the split points, now convert nodes into more memory efficient decision tree
+
 
 class DecisionTreeNode():
-    def __init__(self):
-        pass
+    def __init__(self, parent, GINI_impurity, sample_indices):
+        self.parent = parent
+        self.l_child = None
+        self.r_child = None
+        self.GINI_impurity = GINI_impurity
+        self.sample_indices = sample_indices
+
+    def split(self, X, y, max_features, rand_state, X_sorted_idx):
+        ## Split this node into two others (if it improves overall GINI impurity)
+        #TODO: Don't split if we're at min size
+
+        # Randomly determine which features(columns) we will use as split points 
+        features = rand_state.choice(X.shape[1], max_features, replace=False)
+
+        # Count how many samples we have at each index
+        index_counts = defaultdict(int)
+        for index in self.sample_indices:
+            index_counts[index] += 1
+
+        # Keep track of min GINI impurity value
+        min_GINI_impurity = self.GINI_impurity
+
+        # Iterate through features and get the best split point for the feature
+        for feature in features:
+            X_sorted = []
+            y_sorted = []
+            sample_idx_sorted = []
+            # Iterate through the already sorted data for this feature
+            for sorted_idx in X_sorted_idx[:, feature]:
+                # Add however many samples we had at this index we counted earlier
+                for _ in range(index_counts[sorted_idx]):
+                    X_sorted.append(X[sorted_idx, feature])
+                    y_sorted.append(y[sorted_idx])
+                    sample_idx_sorted.append(sorted_idx)
+            
+            # Now that we've sorted the data for the feature, loop through rows until we find consecutive
+            # ones that are unequal, and try that as the split point
+            split_idx = 1
+            while split_idx < len(X_sorted):
+                if X_sorted[split_idx - 1] != X_sorted[split_idx]:
+                    #Found potential split point, calculate GINI impurity for left and right potential nodes
+                    l_y = y_sorted[:split_idx]
+                    r_y = y_sorted[split_idx:]
+                    l_GINI_impurity = calc_GINI_impurity(l_y)
+                    r_GINI_impurity = calc_GINI_impurity(r_y)
+                    l_weight = len(l_y) / len(y_sorted)
+                    r_weight = len(r_y) / len(y_sorted)
+                    weighted_avg_GINI_impurity = l_weight * l_GINI_impurity + r_weight * r_GINI_impurity
+                    # Check if split point produced a lower GINI impurity than the min so far
+                    if weighted_avg_GINI_impurity < min_GINI_impurity:
+                        #Found new split point; create new child nodes and then continue searching
+                        l_sample_indices = sample_idx_sorted[:split_idx]
+                        r_sample_indices = sample_idx_sorted[split_idx:]
+                        self.l_child = DecisionTreeNode(self, l_GINI_impurity, l_sample_indices)
+                        self.r_child = DecisionTreeNode(self, r_GINI_impurity, r_sample_indices)
+                split_idx += 1
+        
+        #Done splitting; Return list of child nodes (or empty list if this is better off as leaf node)
+        if self.l_child is not None:
+            return [self.l_child, self.r_child]
+        else:
+            return []
+
+    @staticmethod    
+    def calc_GINI_impurity(y):
+        # Calculate the GINI impurity with the given y values
+        vals, counts = np.unique(y, return_counts=True)
+        ps = counts / len(y)
+        GINI_impurity = 1 - sum(ps**2)
+        return GINI_impurity
