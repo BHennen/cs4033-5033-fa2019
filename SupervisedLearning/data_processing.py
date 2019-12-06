@@ -57,7 +57,7 @@ class DataProcessor():
                         # 8, #Ticket
                         9,  # Fare
                         # 10, #Cabin
-                        11,  # Embarked
+                        # 11,  # Embarked
             )
             # Convert certain columns to float values (so we can use numpy arrays)
             converters = {4: lambda sex: {'male':0.0, 'female':1.0}[sex],
@@ -85,8 +85,8 @@ class DataProcessor():
                             except ValueError as e:
                                 print("Default conversion to float did not work.")
                                 raise e
-                    
-                    data.append(cols)
+                    if do_append:
+                        data.append(cols)
             
             data = np.array(data, dtype=np.float_)
 
@@ -119,15 +119,15 @@ class DataProcessor():
             train_valid_sd = np.nanstd(validation_train_X, axis=0)
             #calculate z-score for each datum
             for row_index, row in enumerate(test_X):
-                for col_index, val in enumerate(row[:-1]):  # ignore last column which is target
+                for col_index, val in enumerate(row):  # ignore last column which is target
                     normalized_val = (val - train_valid_mean[col_index]) / train_valid_sd[col_index]
                     test_X[row_index, col_index] = normalized_val
             for row_index, row in enumerate(training_X):
-                for col_index, val in enumerate(row[:-1]):  # ignore last column which is target
+                for col_index, val in enumerate(row):  # ignore last column which is target
                     normalized_val = (val - train_valid_mean[col_index]) / train_valid_sd[col_index]
                     training_X[row_index, col_index] = normalized_val
             for row_index, row in enumerate(validation_X):
-                for col_index, val in enumerate(row[:-1]):  # ignore last column which is target
+                for col_index, val in enumerate(row):  # ignore last column which is target
                     normalized_val = (val - train_valid_mean[col_index]) / train_valid_sd[col_index]
                     validation_X[row_index, col_index] = normalized_val
 
