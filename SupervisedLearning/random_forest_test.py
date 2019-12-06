@@ -1,6 +1,7 @@
 from data_processing import DataProcessor
-import random_forest
+from TREES import DecisionTreeClassifier
 import os
+import numpy as np
 
 if __name__ == "__main__":
     cur_path = os.path.dirname(__file__)
@@ -18,4 +19,11 @@ if __name__ == "__main__":
         #No data found, so process it
         data.process_data((0.1, 0.1, 0.8))  # 10% test, 10% validation, 80% training samples from data
 
-    
+    decision_tree = DecisionTreeClassifier()
+    X = np.array([[1, 2],
+                  [2, 7],
+                  [4, 3]])
+    y = np.array([1, 2, 3])
+    decision_tree.fit(X, y)
+
+    decision_tree

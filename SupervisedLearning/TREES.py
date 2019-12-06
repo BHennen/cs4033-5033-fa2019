@@ -124,8 +124,11 @@ class DecisionTreeClassifier():
         Parameters
         ----------
         X : numpy array
+
         y : 1d numpy array (does not work for multiple feature target (yet?))
+
         sample_indices: Only use these indices when building the tree (repeats allowed)
+
         X_sorted_idx: The indices of X where each column is sorted. 
             idx = X_sorted_idx[1,0] will give the index in X which is the second lowest value for feature(column) 0
             X[idx] will give the second lowest value for feature(column) 0
@@ -142,32 +145,48 @@ class DecisionTreeClassifier():
             raise IndexError("Max features is more than number of features in the data.")
 
         # init node
-        root_node = DecisionTreeNode(parent=None, GINI_impurity=DecisionTreeNode.calc_GINI_impurity(y))
-        nodes = [root_node]
+        root_GINI_impurity = DecisionTreeNode.calc_GINI_impurity(y)
+        root_parent = None
+        self.root_node = DecisionTreeNode(root_parent, root_GINI_impurity, sample_indices, self.min_node_size)
+        nodes = [self.root_node]
         # Loop through nodes, splitting them until we've turned all nodes into nodes that can't be split anymore
         while nodes:
             node = nodes.pop()
-            new_nodes = node.split(X, y, self.max_features, self.rand_state)
+            new_nodes = node.split(X, y, self.max_features, self.rand_state, X_sorted_idx)
             for new_node in new_nodes:
                 nodes.append(new_node)
-        #TODO: Done creating all the split points, now convert nodes into more memory efficient decision tree
 
+    def predict(X):
+        '''
+        Given values X, determine what class y they fall into.
+        '''
+        pass
 
 class DecisionTreeNode():
-    def __init__(self, parent, GINI_impurity, sample_indices):
+    def __init__(self, parent, GINI_impurity, sample_indices, min_node_size):
         self.parent = parent
-        self.l_child = None
-        self.r_child = None
         self.GINI_impurity = GINI_impurity
         self.sample_indices = sample_indices
+        self.min_node_size = min_node_size
+        self.l_child = None
+        self.r_child = None
+        self.split_feature = None
+        self.split_value = None
+        self.predicted_value = None
 
     def split(self, X, y, max_features, rand_state, X_sorted_idx):
         ## Split this node into two others (if it improves overall GINI impurity)
-        #TODO: Don't split if we're at min size
+        # Don't split if we're at min size, and save the predicted y value
+        if len(X) <= self.min_node_size:
+            self.predicted_value = np.mean(y[self.sample_indices])
+            return []
 
         # Randomly determine which features(columns) we will use as split points 
         features = rand_state.choice(X.shape[1], max_features, replace=False)
 
+        # If sample size not set, set sample indices to be the range from 0 to length of X (use the whole dataset)
+        if self.sample_indices is None:
+            self.sample_indices = range(len(X))
         # Count how many samples we have at each index
         index_counts = defaultdict(int)
         for index in self.sample_indices:
@@ -197,8 +216,8 @@ class DecisionTreeNode():
                     #Found potential split point, calculate GINI impurity for left and right potential nodes
                     l_y = y_sorted[:split_idx]
                     r_y = y_sorted[split_idx:]
-                    l_GINI_impurity = calc_GINI_impurity(l_y)
-                    r_GINI_impurity = calc_GINI_impurity(r_y)
+                    l_GINI_impurity = DecisionTreeNode.calc_GINI_impurity(l_y)
+                    r_GINI_impurity = DecisionTreeNode.calc_GINI_impurity(r_y)
                     l_weight = len(l_y) / len(y_sorted)
                     r_weight = len(r_y) / len(y_sorted)
                     weighted_avg_GINI_impurity = l_weight * l_GINI_impurity + r_weight * r_GINI_impurity
@@ -207,14 +226,17 @@ class DecisionTreeNode():
                         #Found new split point; create new child nodes and then continue searching
                         l_sample_indices = sample_idx_sorted[:split_idx]
                         r_sample_indices = sample_idx_sorted[split_idx:]
-                        self.l_child = DecisionTreeNode(self, l_GINI_impurity, l_sample_indices)
-                        self.r_child = DecisionTreeNode(self, r_GINI_impurity, r_sample_indices)
+                        self.l_child = DecisionTreeNode(self, l_GINI_impurity, l_sample_indices, self.min_node_size)
+                        self.r_child = DecisionTreeNode(self, r_GINI_impurity, r_sample_indices, self.min_node_size)
+                        self.split_feature = feature
+                        self.split_value = (X_sorted[split_idx - 1] + X_sorted[split_idx]) / 2 # Value is the mean of the two consecutive data points
                 split_idx += 1
         
         #Done splitting; Return list of child nodes (or empty list if this is better off as leaf node)
         if self.l_child is not None:
             return [self.l_child, self.r_child]
         else:
+            self.predicted_value = np.mean(y[self.sample_indices])
             return []
 
     @staticmethod    
