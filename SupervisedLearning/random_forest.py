@@ -36,14 +36,20 @@ class RandomForestClassifier():
         For classification, the default value for m is ⌊√p⌋.
     
     random_seed : integer, optional (default=None)
-        The random seed used to determine randome elements of the algorithm.
+        The random seed used to determine random elements of the algorithm. If integer provided, it is
+        used as seed. If tuple provided, it is expected to be the tuple that is returned by a call to an
+        instance of RandomState.get_state()
     '''
 
     def __init__(self, n_estimators=50, min_node_size=1, max_features="auto", random_seed=None):
         self.n_estimators = n_estimators
         self.min_node_size = min_node_size
         self.max_features = max_features
-        self.rand_state = np.random.RandomState(seed=random_seed)
+        if isinstance(random_seed, tuple):
+            self.rand_state = np.random.RandomState()
+            self.rand_state.set_state(random_seed)
+        else:
+            self.rand_state = np.random.RandomState(seed=random_seed)
 
     def fit(self, X, y):
         '''
@@ -52,7 +58,7 @@ class RandomForestClassifier():
         Parameters
         ----------
         X : numpy array
-        y : numpy array TODO:maybe not np array?
+        y : numpy array
         '''
         # update max_features to be ⌊√p⌋ if it is == "auto"
         if self.max_features == "auto":
@@ -82,7 +88,57 @@ class RandomForestClassifier():
 
 class DecisionTreeClassifier():
     '''
+    Build a decision tree using the GINI impurity as its criterion for splitting.
+
+    Pseudocode:
+    for node in internal_nodes:
+        vals, counts = np.unique(y, return_counts=True)
+        ps = counts/len(y)
+        gini = 1-sum(ps**2)
+        for feature in features:
+
+    Parameters
+    ----------
+    min_node_size : integer, optional (default=1)
+        The minimum number of samples in a leaf node. Nodes will not be split at this size.
+        For classification, the default value for minimum node size is one.
+
+    max_features : integer, optional (default=⌊√p⌋)`
+        The number of features to consider when looking for the best split.
+        For classification, the default value for m is ⌊√p⌋.
+    
+    random_seed : integer, tuple, optional (default=None)
+        The random seed used to determine random elements of the algorithm. If integer provided, it is
+        used as seed. If tuple provided, it is expected to be the tuple that is returned by a call to an
+        instance of RandomState.get_state()
 
     '''
+
+    def __init__(self, min_node_size=1, max_features="auto", random_seed=None):
+        self.min_node_size = min_node_size
+        self.max_features = max_features
+        if isinstance(random_seed, tuple):
+            self.rand_state = np.random.RandomState()
+            self.rand_state.set_state(random_seed)
+        else:
+            self.rand_state = np.random.RandomState(seed=random_seed)
+    
+    def fit(self, X, y, X_sorted_idx=None):
+        '''
+        Fit data X to target values in y using decision tree classifier.
+
+        Parameters
+        ----------
+        X : numpy array
+        y : numpy array
+        '''
+
+        # Sort each column of X and save sorted indices in 2d array
+        if X_sorted_idx is None:
+            X_sorted_idx = np.argsort(X, axis=0)
+        
+        
+
+class DecisionTreeNode():
     def __init__(self):
         pass
