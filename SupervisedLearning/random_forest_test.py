@@ -19,7 +19,7 @@ if __name__ == "__main__":
         data.load_processed_data()
     except FileNotFoundError:
         #No data found, so process it
-        data.process_data((0.1, 0.1, 0.8), filter_nan=True)  # 10% test, 10% validation, 80% training samples from data
+        data.process_data((0.1, 0.1, 0.8), filter_missing=True)  # 10% test, 10% validation, 80% training samples from data
 
     
 
