@@ -31,11 +31,13 @@ class DataProcessor():
         else:
             raise FileNotFoundError(f"Data not processed yet; no file found at: {self._processed_data_path}")
 
-    def process_data(self, splits):
+    def process_data(self, splits, filter_nan=False):
         '''
         splits: 3-tuple of floats which adds to 1, which is the proportion of data that will be allocated to
             the testing set, validation set, and training set, in that order. (0.1, 0.1, 0.8) means 10% allocated
             each to training and validation, and 80% to training.
+
+        filter_nan: Boolean indicating if we encounter no value for a column, should we skip that row.
         '''
         if sum(splits) != 1:
             raise ArithmeticError("process_data: splits does not add to 1")
@@ -75,12 +77,16 @@ class DataProcessor():
                     if line_no < 1:
                         continue
                     # Iterate through columns, skipping those we dont want, and converting others
+                    skip_line = False
                     cols = []
                     for index, col in enumerate(line):
                         if index not in use_cols:
                             continue
                         if col == '':
                             # Default value for no data
+                            if filter_nan:
+                                skip_line = True
+                                break
                             cols.append(None)
                         elif index in converters:
                             # Try checking for converter
@@ -92,7 +98,8 @@ class DataProcessor():
                             except ValueError as e:
                                 print("Default conversion to float did not work.")
                                 raise e
-                    
+                    if skip_line:
+                        continue
                     data.append(cols)
             
             data = np.array(data, dtype=np.float_)
