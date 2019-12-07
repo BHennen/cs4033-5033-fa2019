@@ -292,7 +292,7 @@ if __name__ == "__main__":
 
     except FileNotFoundError:
         #No data found, so process it
-        data_processor.process_data((0.2, 0.2, 0.6), filter_nan=True)  # 10% test, 10% validation, 80% training samples from data
+        data_processor.process_data((0.2, 0.2, 0.6), filter_missing=True)  # 10% test, 10% validation, 80% training samples from data
 
     # Extract training data, initialize neural network
     (train_x, train_y) = (data_processor.training_X, data_processor.training_y)
