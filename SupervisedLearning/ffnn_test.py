@@ -1,13 +1,11 @@
 from data_processing import DataProcessor
-import random as rand
 import os
 import numpy as np
 import sys
-from datetime import datetime
 
-HIDDEN_LAYER_SIZE = 10
-LEARNING_RATE = 0.0001
-LINEAR_LAMBDA = 0.2
+HIDDEN_LAYER_SIZE = 50
+LEARNING_RATE = 0.001
+LINEAR_LAMBDA = 0.8
 
 NUM_EPOCHS = 1000
 
@@ -20,7 +18,7 @@ class Neuron:
     def __init__(self, input_dimension, weights=None, activation='sigmoid'):
         self.input_dimension = input_dimension
         self.activation = activation
-        self.b = 1
+        self.b = 0.001
         self.w = weights
         self.BIAS = -1
 
@@ -31,7 +29,7 @@ class Neuron:
     def init_weights(self):
         self.w = np.random.rand(self.input_dimension)
         for i, wi in enumerate(self.w):
-            self.w[i] /= 10.0
+            self.w[i] /= 5.0
 
     def process_input(self, x):
         if len(x) != self.input_dimension:
@@ -149,13 +147,22 @@ def do_evaluate():
     global learner, valid_x, valid_y
 
     tmse = 0
-    for i, valid_xi in enumerate(valid_x):
+    accuracy_ctr = 0
+    zero_ctr = 0
+    one_ctr = 0
+    for i, valid_xi in enumerate(train_x):
         y_hat = learner.predict(valid_xi)
-        y_diff = abs(y_hat - valid_y[i])
+        y_diff = abs(y_hat - train_y[i])
         mse_i = y_diff**2
         tmse += mse_i
-    tmse /= len(valid_x)
-    return tmse
+        if (y_hat >= 0.5 and train_y[i] == 1) or (y_hat < 0.5 and train_y[i] == 0):
+            accuracy_ctr += 1
+            if train_y[i] == 0:
+                zero_ctr += 1
+            else:
+                one_ctr += 1
+    tmse /= len(train_x)
+    return tmse, accuracy_ctr, one_ctr, zero_ctr
 
 
 if __name__ == "__main__":
@@ -175,10 +182,12 @@ if __name__ == "__main__":
 
     except FileNotFoundError:
         #No data found, so process it
-        data_processor.process_data((0.1, 0.1, 0.8))  # 10% test, 10% validation, 80% training samples from data
+        data_processor.process_data((0.2, 0.2, 0.6))  # 10% test, 10% validation, 80% training samples from data
 
     # Extract training data, initialize neural network
     (train_x, train_y) = (data_processor.training_X, data_processor.training_y)
+    # train_x = np.array([[i/1000,2*i/1000] for i in range(100)])
+    # train_y = np.array([(train_x[i][0] + train_x[i][1])/1000 for i in range(100)])
     (valid_x, valid_y) = (data_processor.validation_X, data_processor.validation_y)
     print('Loading neural network...')
     learner = FFNN(input_dimension=len(train_x[0]))
@@ -189,8 +198,8 @@ if __name__ == "__main__":
             if verbose:
                 print(f"Beginning epoch {epoch+1}/{NUM_EPOCHS}")
             do_learn()
-            mse_accum[epoch] = do_evaluate()
-            print(f"Epoch {epoch}/{NUM_EPOCHS}: MSE={mse_accum[epoch]}")
+            mse_accum[epoch], accuracy, ones, zeros = do_evaluate()
+            print(f"Epoch {epoch}/{NUM_EPOCHS}: {accuracy}/{len(train_x)} ({zeros}|{ones}); MSE={mse_accum[epoch]}")
 
         mse_x = np.arange(NUM_EPOCHS)
         mse_out = np.array(mse_accum) # np.array([[mse_x[i], mse_accum[i]] for i in range(NUM_EPOCHS)])

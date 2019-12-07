@@ -31,7 +31,7 @@ class DataProcessor():
         else:
             raise FileNotFoundError(f"Data not processed yet; no file found at: {self._processed_data_path}")
 
-    def process_data(self, splits):
+    def process_data(self, splits, filter_nan=False):
         '''
         splits: 3-tuple of floats which adds to 1, which is the proportion of data that will be allocated to
             the testing set, validation set, and training set, in that order. (0.1, 0.1, 0.8) means 10% allocated
@@ -68,6 +68,7 @@ class DataProcessor():
                     if line_no < 1:
                         continue
                     # Iterate through columns, skipping those we dont want, and converting others
+                    do_append = True
                     cols = []
                     for index, col in enumerate(line):
                         if index not in use_cols:
@@ -75,6 +76,9 @@ class DataProcessor():
                         if col == '':
                             # Default value for no data
                             cols.append(None)
+                            if filter_nan:
+                                do_append = False
+                                break
                         elif index in converters:
                             # Try checking for converter
                             cols.append(converters[index](col))
