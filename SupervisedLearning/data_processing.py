@@ -59,7 +59,7 @@ class DataProcessor():
                         # 8, #Ticket
                         9,  # Fare
                         # 10, #Cabin
-                        11,  # Embarked
+                        # 11,  # Embarked
             )
             # Mark features as categorical (so we can one-hot-encode them later)
             # categorical_cols = ()
@@ -83,10 +83,10 @@ class DataProcessor():
                             continue
                         if col == '':
                             # Default value for no data
+                            cols.append(None)
                             if filter_missing:
                                 skip_line = True
                                 break
-                            cols.append(None)
                         elif index in converters:
                             # Try checking for converter
                             cols.append(converters[index](col))
@@ -165,17 +165,6 @@ class DataProcessor():
             for row_index, row in enumerate(validation_X):
                 for col_index, val in enumerate(row):
                     normalized_val = (val - train_valid_mean[col_index]) / train_valid_sd[col_index]
-                    validation_X[row_index, col_index] = normalized_val
-
-            # Save *_X and *_y data
-            self.test_X = test_X
-            self.test_y = test_y
-            self.training_X = training_X
-            self.training_y = training_y
-            self.validation_X = validation_X
-            self.validation_y = validation_y
-
-            print(f"Saving processed data to: {self._processed_data_path}")
             np.savez(self._processed_data_path, test_X=test_X, test_y=test_y, training_X=training_X,
                      training_y=training_y, validation_X=validation_X, validation_y=validation_y)
 
