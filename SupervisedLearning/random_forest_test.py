@@ -1,5 +1,5 @@
 from data_processing import DataProcessor
-from TREES import DecisionTreeClassifier
+from TREES import DecisionTreeClassifier, RandomForestClassifier
 import os
 import numpy as np
 
@@ -19,11 +19,16 @@ if __name__ == "__main__":
         #No data found, so process it
         data.process_data((0.1, 0.1, 0.8))  # 10% test, 10% validation, 80% training samples from data
 
-    decision_tree = DecisionTreeClassifier()
     X = np.array([[1, 2],
                   [2, 7],
-                  [4, 3]])
-    y = np.array([1, 2, 3])
-    decision_tree.fit(X, y)
+                  [2, 3]])
+    y = np.array([1, 3, 2])
 
-    decision_tree
+    random_forest = RandomForestClassifier(n_estimators=100, min_node_size=1, max_features='auto', random_seed=None)
+    random_forest.fit(X,y)
+
+
+    predictions = random_forest.predict(X)
+    probas = random_forest.predict_proba(X)
+    print(predictions)
+    print(probas)
