@@ -59,9 +59,16 @@ class DataProcessor():
                         # 10, #Cabin
                         11,  # Embarked
             )
+            # Mark features as categorical (so we can one-hot-encode them later)
+            categorical_cols = (2,  # Pclass
+                                4,  # Sex
+                                11  # Embarked
+            )
             # Convert certain columns to float values (so we can use numpy arrays)
             converters = {4: lambda sex: {'male':0.0, 'female':1.0}[sex],
                           11: lambda embarked: {'S': 0.0, 'C': 1.0, 'Q': 2.0}[embarked]}
+            # convert column index to actual index in np array (since we may have skipped another col)
+            col_mapping = {col: index for index, col in enumerate(sorted(use_cols))}
             data = []
             with open(self._data_file_path) as data_file:
                 for line_no, line in enumerate(reader(data_file)):
@@ -89,6 +96,27 @@ class DataProcessor():
                     data.append(cols)
             
             data = np.array(data, dtype=np.float_)
+
+            # Convert categorical columns into n new columns, where n is the number of possible classes in that
+            # category. Ex: A column called color with possible values of red, blue, green would be converted
+            # into 3 columns: red, blue and green, each row having value of 1 or 0 for each class
+            #TODO: Does not handle nan correctly (each nan counts as separate category)
+            categorical_idx = [col_mapping[col] for col in categorical_cols]
+            offset = 0
+            for col_idx in categorical_idx:
+                col_idx = col_idx + offset  # Adjust current column index if we have already added new columns to data
+                # Determine how many possibilities there are for this category
+                categories, indices = np.unique(data[:, col_idx], return_inverse=True)
+                num_new_cols = len(categories)
+                offset += num_new_cols - 1 # -1 since we delete the old column
+                one_hot_matrix = np.zeros((len(data), num_new_cols))
+                # loop through indices and set the specified column to 1
+                for row, col in enumerate(indices):
+                    one_hot_matrix[row][col] = 1
+                # Add one_hot_matrix to data
+                data = np.insert(data, col_idx + 1, one_hot_matrix.T, axis=1)
+                # Delete old col
+                data = np.delete(data, col_idx, axis=1)
 
             # Shuffle data
             np.random.shuffle(data)
