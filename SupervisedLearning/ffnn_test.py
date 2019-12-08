@@ -260,7 +260,34 @@ if __name__ == "__main__":
 
     except FileNotFoundError:
         #No data found, so process it
-        data_processor.process_data((0.2, 0.2, 0.6), filter_missing=True)  # 10% test, 10% validation, 80% training samples from data
+         # 20% test, 20% validation, 60% training samples from data
+        splits = (0.2, 0.2, 0.6)
+        # Only use certain columns
+        use_cols = (  # 0, #PassengerID
+                    1,  # Survived
+                    2,  # Pclass
+                    # 3, #Name
+                    4,  # Sex
+                    5,  # Age
+                    6,  # SibSp
+                    7,  # Parch
+                    # 8, #Ticket
+                    9,  # Fare
+                    # 10, #Cabin
+                    # 11,  # Embarked
+        )
+        # Mark features as categorical (so we can one-hot-encode them later)
+        # categorical_cols = ()
+        categorical_cols = (2,  # Pclass
+                            4,  # Sex
+                            11  # Embarked
+        )
+        # Convert certain columns to float values (so we can use numpy arrays)
+        converters = {4: lambda sex: {'male':0.0, 'female':1.0}[sex],
+                      11: lambda embarked: {'S': 0.0, 'C': 1.0, 'Q': 2.0}[embarked]}
+        filter_missing = True
+        data_processor.process_data(splits=splits, use_cols=use_cols, categorical_cols=categorical_cols,
+                                    converters=converters, filter_missing=filter_missing)
 
     # Extract training data, initialize neural network
     (train_x, train_y) = (data_processor.training_X, data_processor.training_y)
