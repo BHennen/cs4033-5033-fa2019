@@ -72,7 +72,7 @@ if __name__ == "__main__":
     unique_y = np.unique(y)
     y_true_proba = np.array([1 if y_elem == unique_y[0] else 0 for y_elem in y])
 
-    random_forest = RandomForestClassifier(n_estimators=30, min_node_size=1, max_features='auto', random_seed=None)
+    random_forest = RandomForestClassifier(n_estimators=30, min_node_size=1, max_features=4, random_seed=None)
     random_forest.fit(X, y)
 
     my_f_predictions = random_forest.predict(X)
@@ -82,7 +82,7 @@ if __name__ == "__main__":
     my_f_percent_correct = my_f_num_correct / len(my_f_predictions)
     print(f"{my_f_num_correct} / {len(my_f_predictions)}; Train Accuracy:{my_f_percent_correct:.4f}, Xentropy:{my_f_xentropy}")
     
-    skrf = ensemble.RandomForestClassifier(n_estimators=30, max_features='auto')
+    skrf = ensemble.RandomForestClassifier(n_estimators=30, max_features=4)
     skrf.fit(X, y)
     skrf_train_predictions = skrf.predict(X)
     skrf_train_proba = skrf.predict_proba(X)
@@ -92,11 +92,9 @@ if __name__ == "__main__":
     print(f"{skrf_train_num_correct} / {len(skrf_train_predictions)}; SKRF Train Accuracy:{skrf_train_percent_correct:.4f}, Xentropy:{skrf_train_xentropy}")
 
     skrf_POFD_arr, skrf_POD_arr = Metrics.get_ROC_data(skrf_train_proba[:, 0], y_true_proba)
-    skrf_AUC = Metrics.get_AUC(skrf_POFD_arr, skrf_POD_arr, is_sorted=True)
-    Metrics.add_ROC_curve(skrf_POFD_arr, skrf_POD_arr, f"sklearn rf: AUC={skrf_AUC:.4f}", color="r")
+    skrf_AUC = Metrics.add_ROC_curve(skrf_POFD_arr, skrf_POD_arr, f"sklearn rf -", color="r")
     my_f_POFD_arr, my_f_POD_arr = Metrics.get_ROC_data(my_f_proba[:, 0], y_true_proba)
-    my_f_AUC = Metrics.get_AUC(my_f_POFD_arr, my_f_POD_arr, is_sorted=True)
-    Metrics.add_ROC_curve(my_f_POFD_arr, my_f_POD_arr, f"my rf: AUC={my_f_AUC:.4f}", color="g")
+    my_f_AUC = Metrics.add_ROC_curve(my_f_POFD_arr, my_f_POD_arr, f"my rf -", color="g")
     Metrics.show_ROC_curve("aiosjdfoais")
 
 

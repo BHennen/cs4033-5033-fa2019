@@ -264,18 +264,36 @@ class Metrics():
         POD_arr.append(1)
         POFD_arr.append(1)
 
-        # Sort by POFD_arr in ascending order
-        data = list(zip(POFD_arr, POD_arr))
-        data.sort()  
-        return zip(*data)
+        # # Sort by POFD_arr in ascending order
+        # data = list(zip(POFD_arr, POD_arr))
+        # data.sort()  
+        return POFD_arr, POD_arr
     
     @staticmethod
-    def add_ROC_curve(POFD_arr, POD_arr, label, color):
+    def add_ROC_curve(POFD_arr, POD_arr, label, color, include_AUC=True):
         ''' Plot ROC curve
         
             Does not display curve until show_roc_curve is called.
+
+            Parameters
+            ----------
+            label : String
+
+            color : Color
+
+            include_AUC : Boolean
+                Whether or not to include the area under the curve as part of the label.
+
         '''
 
+        # Sort by POFD values in ascending order
+        POFD_arr, POD_arr = zip(*sorted(zip(POFD_arr, POD_arr)))
+
+        # Calculate area under curve
+        AUC = None
+        if include_AUC:
+            AUC = Metrics.get_AUC(POFD_arr, POD_arr, is_sorted=True)
+            
         #grey line
         x = np.linspace(0, 1, 100)
         y = x
@@ -286,7 +304,9 @@ class Metrics():
         # Labels
         plt.xlabel('Probability of False Detection (POFD)')
         plt.ylabel('Probability of Detection (POD)')        
-        plt.plot(POFD_arr, POD_arr, color=color, label=label)
+        plt.plot(POFD_arr, POD_arr, color=color, label=label + f" AUC: {AUC:.4f}")
+
+        return AUC
         
 
     @staticmethod
