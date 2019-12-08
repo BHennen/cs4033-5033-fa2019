@@ -1,9 +1,11 @@
 import os
 import numpy as np
 from csv import reader
+import matplotlib.pyplot as plt
 
 
 class DataProcessor():
+
     def __init__(self, data_file_path, processed_data_folder, processed_data_filename="processed_data.npz"):
         self._data_file_path = data_file_path
         self._processed_data_folder = processed_data_folder
@@ -33,11 +35,25 @@ class DataProcessor():
 
     def process_data(self, splits, use_cols, categorical_cols, converters, filter_missing):
         '''
-        splits: 3-tuple of floats which adds to 1, which is the proportion of data that will be allocated to
+        Parameters
+        ----------
+        splits: tuple
+            Tuple of floats which adds to 1, which is the proportion of data that will be allocated to
             the testing set, validation set, and training set, in that order. (0.1, 0.1, 0.8) means 10% allocated
             each to training and validation, and 80% to training.
 
-        filter_missing: Boolean indicating if we encounter no value for a column, should we skip that row.
+        use_cols : tuple
+            Specifies which columns to use from the raw data.
+
+        categorical_cols : tuple
+            From the raw data, specifies which columns are to be treated as categorical.
+
+        converters : dict
+            Mapping from raw column to a function which returns the processed value for that datum.
+            Ex: {4: lambda x: x + 1} # For column 4, take the raw value and add 1 to it
+
+        filter_missing: Boolean 
+            Indicates if we encounter no value for a column, should we skip that row.
         '''
         if sum(splits) != 1:
             raise ArithmeticError("process_data: splits does not add to 1")
@@ -109,7 +125,7 @@ class DataProcessor():
             #TODO: Does not handle nan correctly (each nan counts as separate category, not a big deal if filtering missing)
             # convert column index to actual index in np array (since we may have skipped another col)
             col_mapping = {col: index for index, col in enumerate(sorted(use_cols))}
-            categorical_idx = [col_mapping[col] for col in categorical_cols]
+            categorical_idx = [col_mapping[col] for col in categorical_cols if col in col_mapping.keys()]
             offset = 0
             for col_idx in categorical_idx:
                 col_idx = col_idx + offset  # Adjust current column index if we have already added new columns to data
@@ -172,3 +188,167 @@ class DataProcessor():
 
         else:
             raise FileNotFoundError(f"No data at path specified:{self._data_file_path}")
+
+class Metrics():
+    roc_thresholds = np.arange(0.000, 1.001, 0.001)
+
+    @staticmethod
+    def get_ROC_data(calc_proba, true_proba):
+        '''
+        Given the calculated probabilities and true probabilities, find the Probability of Detection (POD) and 
+        Probability of False Detection (POFD) values for each threshold in Metrics.roc_thresholds. Can be used
+        to plot the ROC curve or find the AUC for ROC plot.
+
+        This function only works for probabilities for one class (Ex: Is it green or not?).
+
+        Parameters
+        ----------
+        calc_proba : 1d numpy array of floats from [0.0-1.0]
+            Calculated probabilities where each row in calc_proba is the probability that the datum is part of a class.
+
+        true_proba : 1d numpy array of floats from [0.0-1.0]
+            True probabilities where each row in true_proba is the true probability that the datum is part of a class.    
+        
+        Returns
+        -------
+        (POFD_arr, POD_arr) : tuple of arrays
+            POFD and POD are arrays where each element corresponds to one threshold in the determinization thresholds.
+            Returned in order sorted by POFD_arr
+        
+        '''
+
+        if len(calc_proba) != len(true_proba):
+            raise IndexError("Unequal probability list length.")
+
+        dtrmzd_proba = [] # Determinized (ie 1 or 0) probability for the calculated probability
+
+        # Determinize probabilities
+        for threshold in Metrics.roc_thresholds:
+            def determinizer(p): return 1 if p >= threshold else 0
+            vdeterminizer = np.vectorize(determinizer)
+            dtrmzd_proba.append(vdeterminizer(calc_proba))
+
+        # Compute probability of detection and probability of false detection
+        POD_arr = []
+        POFD_arr = []
+
+        for threshold_idx, threshold in enumerate(Metrics.roc_thresholds):
+            # a - Number of: Event observed, forecasted
+            # c - Number of: Event observed, not forecasted
+            # b - Number of: Event not observed, forecasted
+            # d - Number of: Event not observed, not forecasted
+            # Calculate a b c d
+            abcd = {"a": 0, "b": 0, "c": 0, "d": 0}
+            calc_proba = dtrmzd_proba[threshold_idx]
+            for obs_idx, observation in enumerate(true_proba):
+                if observation == 1:  # Event observed
+                    if calc_proba[obs_idx] == 1:  # forecasted
+                        abcd["a"] += 1
+                    else:  # not forecasted
+                        abcd["c"] += 1
+                else:  # Event not observed
+                    if calc_proba[obs_idx] == 1:  # forecasted
+                        abcd["b"] += 1
+                    else:  # not forecasted
+                        abcd["d"] += 1
+
+            #Calculate POD = a/(a+c) and POFD = b/(b+d)
+            POD = abcd["a"] / (abcd["a"] + abcd["c"])
+            POFD = abcd["b"] / (abcd["b"] + abcd["d"])
+            POD_arr.append(POD)
+            POFD_arr.append(POFD)
+        
+        #Make sure we have (0,0) and (1,1)
+        POD_arr.append(0)
+        POFD_arr.append(0)
+        POD_arr.append(1)
+        POFD_arr.append(1)
+
+        # # Sort by POFD_arr in ascending order
+        # data = list(zip(POFD_arr, POD_arr))
+        # data.sort()  
+        return POFD_arr, POD_arr
+    
+    @staticmethod
+    def add_ROC_curve(POFD_arr, POD_arr, label, color, include_AUC=True):
+        ''' Plot ROC curve
+        
+            Does not display curve until show_roc_curve is called.
+
+            Parameters
+            ----------
+            label : String
+
+            color : Color
+
+            include_AUC : Boolean
+                Whether or not to include the area under the curve as part of the label.
+
+        '''
+
+        # Sort by POFD values in ascending order
+        POFD_arr, POD_arr = zip(*sorted(zip(POFD_arr, POD_arr)))
+
+        # Calculate area under curve
+        AUC = None
+        if include_AUC:
+            AUC = Metrics.get_AUC(POFD_arr, POD_arr, is_sorted=True)
+            
+        #grey line
+        x = np.linspace(0, 1, 100)
+        y = x
+        greycolor = (.6, .6, .6)
+        linestyle = "--"
+        plt.plot(x, y, color=greycolor, linestyle=linestyle)
+
+        # Labels
+        plt.xlabel('Probability of False Detection (POFD)')
+        plt.ylabel('Probability of Detection (POD)')        
+        plt.plot(POFD_arr, POD_arr, color=color, label=label + f" AUC: {AUC:.4f}")
+
+        return AUC
+        
+
+    @staticmethod
+    def show_ROC_curve(title):
+        plt.legend()
+        plt.title(title + " ROC Curve")
+        plt.show()
+
+    @staticmethod
+    def get_AUC(x_vals, y_vals, is_sorted=False):
+        '''Get area under the curve of a plot. Uses integration approximation using midpoint rule.
+
+        Parameters
+        ----------
+        x_vals : Array
+            Values for the x-axis. For ROC curve, this would be POFD_arr.
+
+        y_vals : Array 
+            Values for the y-axis, corresponding with the x_vals. For ROC curve, this would be POD_arr.
+        
+        is_sorted: Boolean
+            Whether or not the data is sorted already by the x_vals.
+
+        '''
+
+        if len(x_vals) != len(y_vals):
+            raise IndexError("Unequal list length.")
+
+        data = list(zip(x_vals, y_vals))
+        if not is_sorted: data.sort()  # Sort by x_vals ascending order
+        dx = 0
+        prev_y = 0
+        prev_x = data[0][0]
+        tot_area = 0
+        
+        for idx, (x_val, y_val) in enumerate(data):
+            #Calculate using trapezoidal rule
+            y_avg = (y_val + prev_y) / 2
+            dx = x_val - prev_x
+            area = y_avg * dx
+            tot_area += area
+            prev_x = x_val
+            prev_y = y_val
+
+        return tot_area
