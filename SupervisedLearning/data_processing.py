@@ -62,30 +62,6 @@ class DataProcessor():
         if os.path.exists(self._data_file_path):
             # Process data
             print(f"Processing data: {self._data_file_path}")
-            
-            # # Only use certain columns
-            # use_cols = (  # 0, #PassengerID
-            #             1,  # Survived
-            #             2,  # Pclass
-            #             # 3, #Name
-            #             4,  # Sex
-            #             5,  # Age
-            #             6,  # SibSp
-            #             7,  # Parch
-            #             # 8, #Ticket
-            #             9,  # Fare
-            #             # 10, #Cabin
-            #             11,  # Embarked
-            # )
-            # # Mark features as categorical (so we can one-hot-encode them later)
-            # # categorical_cols = ()
-            # categorical_cols = (2,  # Pclass
-            #                     4,  # Sex
-            #                     11  # Embarked
-            # )
-            # # Convert certain columns to float values (so we can use numpy arrays)
-            # converters = {4: lambda sex: {'male':0.0, 'female':1.0}[sex],
-            #               11: lambda embarked: {'S': 0.0, 'C': 1.0, 'Q': 2.0}[embarked]}
             data = []
             with open(self._data_file_path) as data_file:
                 for line_no, line in enumerate(reader(data_file)):
@@ -182,7 +158,6 @@ class DataProcessor():
                 for col_index, val in enumerate(row):
                     normalized_val = (val - train_valid_mean[col_index]) / train_valid_sd[col_index]
                     self.validation_X[row_index, col_index] = normalized_val
-
             np.savez(self._processed_data_path, test_X=self.test_X, test_y=self.test_y, training_X=self.training_X,
                      training_y=self.training_y, validation_X=self.validation_X, validation_y=self.validation_y)
 
