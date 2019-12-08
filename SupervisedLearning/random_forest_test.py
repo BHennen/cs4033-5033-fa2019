@@ -48,7 +48,7 @@ if __name__ == "__main__":
     my_f_percent_correct = my_f_num_correct / len(my_f_predictions)
     print(f"{my_f_num_correct} / {len(my_f_predictions)}; Train Accuracy:{my_f_percent_correct:.4f}, Xentropy:{my_f_xentropy}")
     
-    skrf = ensemble.RandomForestClassifier(n_estimators=100)
+    skrf = ensemble.RandomForestClassifier(n_estimators=100, max_features='auto')
     skrf.fit(X, y)
     skrf_train_predictions = skrf.predict(X)
     skrf_train_proba = skrf.predict_proba(X)
