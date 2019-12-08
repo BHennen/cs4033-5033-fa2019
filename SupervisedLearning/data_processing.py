@@ -65,7 +65,7 @@ class DataProcessor():
             # categorical_cols = ()
             categorical_cols = (2,  # Pclass
                                 4,  # Sex
-                                11  # Embarked
+                                # 11  # Embarked
             )
             # Convert certain columns to float values (so we can use numpy arrays)
             converters = {4: lambda sex: {'male':0.0, 'female':1.0}[sex],
@@ -142,31 +142,32 @@ class DataProcessor():
             # Remove target columns from dataset and save them for later
             # *_X = only predictors for the data
             # *_y = only target columns for the data
-            test_X = np.delete(test_data, 0, 1)  # delete target column
-            test_y = test_data[:, 0]  # Only use target column
-            training_X = np.delete(training_data, 0, 1)  # delete target column
-            training_y = training_data[:, 0]  # Only use target column
-            validation_X = np.delete(validation_data, 0, 1)  # delete target column
-            validation_y = validation_data[:, 0]  # Only use target column
+            self.test_X = np.delete(test_data, 0, 1)  # delete target column
+            self.test_y = test_data[:, 0]  # Only use target column
+            self.training_X = np.delete(training_data, 0, 1)  # delete target column
+            self.training_y = training_data[:, 0]  # Only use target column
+            self.validation_X = np.delete(validation_data, 0, 1)  # delete target column
+            self.validation_y = validation_data[:, 0]  # Only use target column
 
             ## Normalize predictor data
             #Get mean and standard deviation of each column (except the last)
             train_valid_mean = np.nanmean(validation_train_X, axis=0)
             train_valid_sd = np.nanstd(validation_train_X, axis=0)
             #calculate z-score for each datum
-            for row_index, row in enumerate(test_X):
+            for row_index, row in enumerate(self.test_X):
                 for col_index, val in enumerate(row):
                     normalized_val = (val - train_valid_mean[col_index]) / train_valid_sd[col_index]
-                    test_X[row_index, col_index] = normalized_val
-            for row_index, row in enumerate(training_X):
+                    self.test_X[row_index, col_index] = normalized_val
+            for row_index, row in enumerate(self.training_X):
                 for col_index, val in enumerate(row):
                     normalized_val = (val - train_valid_mean[col_index]) / train_valid_sd[col_index]
-                    training_X[row_index, col_index] = normalized_val
-            for row_index, row in enumerate(validation_X):
+                    self.training_X[row_index, col_index] = normalized_val
+            for row_index, row in enumerate(self.validation_X):
                 for col_index, val in enumerate(row):
                     normalized_val = (val - train_valid_mean[col_index]) / train_valid_sd[col_index]
-            np.savez(self._processed_data_path, test_X=test_X, test_y=test_y, training_X=training_X,
-                     training_y=training_y, validation_X=validation_X, validation_y=validation_y)
+                    self.validation_X[row_index, col_index] = normalized_val
+            np.savez(self._processed_data_path, test_X=self.test_X, test_y=self.test_y, training_X=self.training_X,
+                     training_y=self.training_y, validation_X=self.validation_X, validation_y=self.validation_y)
 
         else:
             raise FileNotFoundError(f"No data at path specified:{self._data_file_path}")
