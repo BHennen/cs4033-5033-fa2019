@@ -31,7 +31,7 @@ class DataProcessor():
         else:
             raise FileNotFoundError(f"Data not processed yet; no file found at: {self._processed_data_path}")
 
-    def process_data(self, splits, filter_missing=False):
+    def process_data(self, splits, use_cols, categorical_cols, converters, filter_missing):
         '''
         splits: 3-tuple of floats which adds to 1, which is the proportion of data that will be allocated to
             the testing set, validation set, and training set, in that order. (0.1, 0.1, 0.8) means 10% allocated
@@ -47,29 +47,29 @@ class DataProcessor():
             # Process data
             print(f"Processing data: {self._data_file_path}")
             
-            # Only use certain columns
-            use_cols = (  # 0, #PassengerID
-                        1,  # Survived
-                        2,  # Pclass
-                        # 3, #Name
-                        4,  # Sex
-                        5,  # Age
-                        6,  # SibSp
-                        7,  # Parch
-                        # 8, #Ticket
-                        9,  # Fare
-                        # 10, #Cabin
-                        11,  # Embarked
-            )
-            # Mark features as categorical (so we can one-hot-encode them later)
-            # categorical_cols = ()
-            categorical_cols = (2,  # Pclass
-                                4,  # Sex
-                                11  # Embarked
-            )
-            # Convert certain columns to float values (so we can use numpy arrays)
-            converters = {4: lambda sex: {'male':0.0, 'female':1.0}[sex],
-                          11: lambda embarked: {'S': 0.0, 'C': 1.0, 'Q': 2.0}[embarked]}
+            # # Only use certain columns
+            # use_cols = (  # 0, #PassengerID
+            #             1,  # Survived
+            #             2,  # Pclass
+            #             # 3, #Name
+            #             4,  # Sex
+            #             5,  # Age
+            #             6,  # SibSp
+            #             7,  # Parch
+            #             # 8, #Ticket
+            #             9,  # Fare
+            #             # 10, #Cabin
+            #             11,  # Embarked
+            # )
+            # # Mark features as categorical (so we can one-hot-encode them later)
+            # # categorical_cols = ()
+            # categorical_cols = (2,  # Pclass
+            #                     4,  # Sex
+            #                     11  # Embarked
+            # )
+            # # Convert certain columns to float values (so we can use numpy arrays)
+            # converters = {4: lambda sex: {'male':0.0, 'female':1.0}[sex],
+            #               11: lambda embarked: {'S': 0.0, 'C': 1.0, 'Q': 2.0}[embarked]}
             data = []
             with open(self._data_file_path) as data_file:
                 for line_no, line in enumerate(reader(data_file)):
