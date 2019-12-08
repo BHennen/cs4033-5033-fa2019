@@ -2,7 +2,7 @@ from data_processing import DataProcessor
 from TREES import DecisionTreeClassifier, RandomForestClassifier
 import os
 import numpy as np
-from sklearn import ensemble, metrics
+from sklearn import ensemble, metrics, tree
 
 
 if __name__ == "__main__":
@@ -19,31 +19,67 @@ if __name__ == "__main__":
         data.load_processed_data()
     except FileNotFoundError:
         #No data found, so process it
-        data.process_data((0.1, 0.1, 0.8), filter_missing=True)  # 10% test, 10% validation, 80% training samples from data
+        # 10% test, 10% validation, 80% training samples from data
+        splits = (0.1, 0.1, 0.8)
+        # Only use certain columns
+        use_cols = (  # 0, #PassengerID
+                    1,  # Survived
+                    2,  # Pclass
+                    # 3, #Name
+                    4,  # Sex
+                    5,  # Age
+                    6,  # SibSp
+                    7,  # Parch
+                    # 8, #Ticket
+                    9,  # Fare
+                    # 10, #Cabin
+                    11,  # Embarked
+        )
+        # Mark features as categorical (so we can one-hot-encode them later)
+        # categorical_cols = ()
+        categorical_cols = (2,  # Pclass
+                            4,  # Sex
+                            11  # Embarked
+        )
+        # Convert certain columns to float values (so we can use numpy arrays)
+        converters = {4: lambda sex: {'male':0.0, 'female':1.0}[sex],
+                        11: lambda embarked: {'S': 0.0, 'C': 1.0, 'Q': 2.0}[embarked]}
+        data.process_data(splits=splits, use_cols=use_cols, categorical_cols=categorical_cols, converters=converters, 
+                          filter_missing=True)
 
+    # X = np.array([[1,1],[1,2]])
+    # y = np.array([1,2])
+
+    # my_t = DecisionTreeClassifier()
+    # my_t.fit(X,y)
+    # my_t_p = my_t.predict(X)
+    # my_t_pp = my_t.predict_proba(X)
+
+    # sk_t = tree.DecisionTreeClassifier(max_features="auto")
     
+    # sk_t.fit(X,y)
+    # skt_t_p = sk_t.predict(X)
+    # skt_t_pp = sk_t.predict_proba(X)
+
+    X = np.concatenate((data.training_X, data.validation_X), axis=0)
+    y = np.concatenate((data.training_y, data.validation_y), axis = 0)
 
     random_forest = RandomForestClassifier(n_estimators=100, min_node_size=1, max_features='auto', random_seed=None)
-    random_forest.fit(data.training_X, data.training_y)
+    random_forest.fit(X, y)
 
-    train_predictions = random_forest.predict(data.training_X)
-    train_proba = random_forest.predict_proba(data.training_X)
-    train_xentropy = metrics.log_loss(data.training_y, train_proba)
-    train_num_correct = np.sum(np.equal(train_predictions, data.training_y))
-    train_percent_correct = train_num_correct / len(train_predictions)
-    print(f"{train_num_correct} / {len(train_predictions)}; Train Accuracy:{train_percent_correct:.4f}, Xentropy:{train_xentropy}")
-    validation_predictions = random_forest.predict(data.validation_X)
-    validation_num_correct = np.sum(np.equal(validation_predictions, data.validation_y))
-    validation_percent_correct = validation_num_correct / len(validation_predictions)
-
-    print(f"{validation_num_correct} / {len(validation_predictions)}; Validation Accuracy:{validation_percent_correct}")
+    my_f_predictions = random_forest.predict(X)
+    my_f_proba = random_forest.predict_proba(X)
+    my_f_xentropy = metrics.log_loss(y, my_f_proba)
+    my_f_num_correct = np.sum(np.equal(my_f_predictions, y))
+    my_f_percent_correct = my_f_num_correct / len(my_f_predictions)
+    print(f"{my_f_num_correct} / {len(my_f_predictions)}; Train Accuracy:{my_f_percent_correct:.4f}, Xentropy:{my_f_xentropy}")
     
-    skrf = ensemble.RandomForestClassifier(n_estimators=100)
-    skrf.fit(data.training_X, data.training_y)
-    skrf_train_predictions = skrf.predict(data.training_X)
-    skrf_train_proba = skrf.predict_proba(data.training_X)
-    skrf_train_xentropy = metrics.log_loss(data.training_y, skrf_train_proba)
-    skrf_train_num_correct = np.sum(np.equal(skrf_train_predictions, data.training_y))
+    skrf = ensemble.RandomForestClassifier(n_estimators=100, max_features='auto')
+    skrf.fit(X, y)
+    skrf_train_predictions = skrf.predict(X)
+    skrf_train_proba = skrf.predict_proba(X)
+    skrf_train_xentropy = metrics.log_loss(y, skrf_train_proba)
+    skrf_train_num_correct = np.sum(np.equal(skrf_train_predictions, y))
     skrf_train_percent_correct = skrf_train_num_correct / len(skrf_train_predictions)
     print(f"{skrf_train_num_correct} / {len(skrf_train_predictions)}; SKRF Train Accuracy:{skrf_train_percent_correct:.4f}, Xentropy:{skrf_train_xentropy}")
 

@@ -61,17 +61,24 @@ class RandomForestClassifier():
         for _ in range(self.n_estimators):
             tree = self._grow_tree(X, y, sample_size, X_sorted_idx)
             self.forest.append(tree)
+        return self
 
     def predict(self, X):
         '''
         Predict classes for X values
         '''
-        # Calculate mean prediction
-        probas = self.predict_proba(X)
-        # Get indices of max proba for each X
-        y_class_ind = np.argmax(probas, axis=1)
-        # Get classes for each X
-        return self.y_classes[y_class_ind]
+        # Get predictions from each tree
+        predictions = []
+        predictions_list = np.column_stack([tree.predict(X) for tree in self.forest])
+        for x in predictions_list:
+            values, counts = np.unique(x, return_counts=True)
+            x_pred = values[counts.argmax()]
+            predictions.append(x_pred)
+        # # Get counts of each prediction
+        # values, counts = np.unique(predictions, return_counts=True)
+        # # Prediction is the value with the most counts
+        # prediction = values[counts.argmax()]
+        return np.array(predictions)
 
 
     def predict_proba(self, X):
@@ -79,9 +86,9 @@ class RandomForestClassifier():
         Predict probabilities for classes in y for given X values
         '''
         #Loop through all trees, getting their individual prediction
-        predictions = [tree.predict(X) for tree in self.forest]
+        probas = [tree.predict_proba(X) for tree in self.forest]
         #Get mean of predictions
-        predict_proba = np.mean(predictions, axis=0)
+        predict_proba = np.mean(probas, axis=0)
         return predict_proba
             
     
@@ -179,10 +186,11 @@ class DecisionTreeClassifier():
             new_nodes = node.split(X, y, self.max_features, self.rand_state, X_sorted_idx, self.y_classes)
             for new_node in new_nodes:
                 nodes.append(new_node)
+        return self
 
     def predict(self, X):
         '''
-        Given values X, predict what the probability of class y they fall into.
+        Given values X, predict what class in y they fall into.
         '''
         if self.root_node is None:
             raise RuntimeError("Not able to predict without calling fit first.")
@@ -197,11 +205,33 @@ class DecisionTreeClassifier():
                     node = node.l_child
                 else:
                     node = node.r_child
-            predictions.append(node.predicted_probas)
+            # Found root node. Now take find index in nodes
+            y_class_idx = np.argmax(node.prediction_counts)
+            y_class_pred = self.y_classes[y_class_idx]
+            predictions.append(y_class_pred)
+        return np.array(predictions)
+    
+    def predict_proba(self, X):
+        '''
+        Given values X, predict what probabilities of class in y they fall into.
+        '''
+        predictions = []
+        for x in X:
+            # Starting at root node, follow decision tree split feature and split value until we hit
+            # a leaf node; the leaf_nodes predicted value will be the prediction for x
+            node = self.root_node
+            while not node.is_leaf():
+                if x[node.split_feature] < node.split_value:
+                    node = node.l_child
+                else:
+                    node = node.r_child
+            probabilities = node.prediction_counts / sum(node.prediction_counts)
+            predictions.append(probabilities)
         if len(predictions) == 1:
             return predictions[0]
         else:
             return np.array(predictions)
+
 
 class DecisionTreeNode():
     def __init__(self, parent, GINI_impurity, sample_indices, min_node_size):
@@ -213,7 +243,7 @@ class DecisionTreeNode():
         self.r_child = None
         self.split_feature = None
         self.split_value = None
-        self.predicted_probas = None
+        self.prediction_counts = None
 
     def split(self, X, y, max_features, rand_state, X_sorted_idx, y_classes):
         ## Split this node into two others (if it improves overall GINI impurity)        
@@ -225,12 +255,14 @@ class DecisionTreeNode():
         # Don't split if we're at min size, and save the predicted y value
         if len(self.sample_indices) <= self.min_node_size:
             # calculate probability of falling into a certain y class
-            self.predicted_probas = self._calc_probas(y, y_classes)
+            self._calc_counts(y, y_classes)
             return []
 
         # Randomly determine which features(columns) we will use as split points 
+        #TODO: continue selecting features until we've exhausted them all and we cannot find a good split
         features = rand_state.choice(X.shape[1], max_features, replace=False)
         
+
         # Count how many samples we have at each index
         index_counts = defaultdict(int)
         for index in self.sample_indices:
@@ -280,7 +312,7 @@ class DecisionTreeNode():
         if self.l_child is not None:
             return [self.l_child, self.r_child]
         else:
-            self.predicted_probas = self._calc_probas(y, y_classes)
+            self._calc_counts(y, y_classes)
             return []
 
     def is_leaf(self):
@@ -289,23 +321,22 @@ class DecisionTreeNode():
         '''
         return self.l_child is None
 
-    def _calc_probas(self, y, y_classes):
-        # calculate probability of falling into a certain y class
+    def _calc_counts(self, y, y_classes):
+        # calculate the counts in this node of all the y's for each class
         # Get all target values for the specified sample indices
         predictions = y[self.sample_indices]
         vals, counts = np.unique(predictions, return_counts=True)
-        probabilities = counts / sum(counts)
-        predicted_probas = np.zeros_like(y_classes, dtype=np.float_)
+        prediction_counts = np.zeros_like(y_classes, dtype=np.float_)
         predict_class_idx = 0
         # Loop through possible classes
         for y_class_idx, y_class in enumerate(y_classes):
-            # If current y class matches the current y class in our predictions, set that probability
+            # If current y class matches the current y class in our predictions, set that probability and counts
             if y_class == vals[predict_class_idx]:
-                predicted_probas[y_class_idx] = probabilities[predict_class_idx]
+                prediction_counts[y_class_idx] = counts[predict_class_idx]
                 predict_class_idx += 1
                 if predict_class_idx >= len(vals):
                     break
-        return predicted_probas
+        self.prediction_counts = prediction_counts
 
     @staticmethod    
     def calc_GINI_impurity(y):
