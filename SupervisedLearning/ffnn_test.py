@@ -4,12 +4,11 @@ import numpy as np
 import sys
 import random as rand
 
-HIDDEN_LAYER_SIZE = 10
+# Defines sequence of hidden layer sizes to run with
+HIDDEN_LAYER_SIZES = [10, 20, 50, 70, 100]
 LEARNING_RATE = 0.5
 
 NUM_EPOCHS = 1000
-
-FFNN_WEIGHTS_FILE = f'ffnn_weights_{HIDDEN_LAYER_SIZE}.npz'
 
 verbose = False
 
@@ -116,25 +115,21 @@ class Layer:
 # Predictors used: columns 2, 5, 6, 7, 9
 class FFNN:
     def __init__(self, input_dimension, output_dimension,
-                 hidden_layer_size=HIDDEN_LAYER_SIZE, learning_rate=LEARNING_RATE):
+                 hidden_layer_size, weights_file, learning_rate=LEARNING_RATE):
         self.input_dim = input_dimension
         self.hidden_layer_size = hidden_layer_size
         self.learning_rate = learning_rate
         self.output_dimension = output_dimension
         file_weights = None
-        # i_weights = None
         h_weights = None
         o_weights = None
-        if os.path.exists(FFNN_WEIGHTS_FILE):
+        if os.path.exists(weights_file):
             print('Importing FFNN weights from existing file...')
             file_weights = np.load(FFNN_WEIGHTS_FILE)
             h_weights = file_weights['arr_0']
             o_weights = file_weights['arr_1']
-            # i_weights = file_weights['arr_2']
         else:
             print("No FFNN weight file found, creating new FFNN.")
-
-
 
         # Create output layer
         self.output_layer = Layer(input_dimension=hidden_layer_size, output_dimension=output_dimension,
@@ -165,7 +160,6 @@ class FFNN:
             output_err = -(target[o] - o_output[o])
             input_err = o_output[o] * (1 - o_output[o])
             err_output_total[o] = output_err * input_err
-            # err_output_total[o] = o_neuron.get_error_total(target[o])
 
         # Hidden Gradient
         err_hidden_total = [0] * len(self.hidden_layer.neurons)
@@ -218,8 +212,8 @@ def do_evaluate():
     accuracy_ctr = 0
     zero_ctr = 0
     one_ctr = 0
-    for i, valid_xi in enumerate(train_x):
-        y = train_y[i]
+    for i, valid_xi in enumerate(valid_x):
+        y = valid_y[i]
         y_hat = learner.predict(valid_xi)
         # MSE
         err_i = 0
@@ -227,19 +221,19 @@ def do_evaluate():
             err_ij = 0.5 * (y[j] - y_hat[j])**2
             err_i += err_ij
         # binary cross-entropy
-        # if train_y[i][1] == 1:
+        # if valid_y[i][1] == 1:
         #     err_i = sum([-log(y_hat[j]) for j in range(len(y_hat))])
         # else:
-        #     err_i = log_loss(train_y[i], y_hat)
+        #     err_i = log_loss(valid_y[i], y_hat)
         err_accum += err_i
         # If p_zero >= p_one and target is zero,         or p_one > p_zero and target is one
-        if (y_hat[0] >= y_hat[1] and train_y[i][0] == 1) or (y_hat[1] > y_hat[0] and train_y[i][1] == 1):
+        if (y_hat[0] >= y_hat[1] and valid_y[i][0] == 1) or (y_hat[1] > y_hat[0] and valid_y[i][1] == 1):
             accuracy_ctr += 1
-            if train_y[i][1] == 1:
+            if valid_y[i][1] == 1:
                 one_ctr += 1
             else:
                 zero_ctr += 1
-    err_accum /= len(train_x)
+    err_accum /= len(valid_x)
     return err_accum, accuracy_ctr, one_ctr, zero_ctr
 
 
@@ -255,12 +249,12 @@ if __name__ == "__main__":
 
     # Load data
     try:
-        #Try to load data
+        # Try to load data
         data_processor.load_processed_data()
 
     except FileNotFoundError:
-        #No data found, so process it
-         # 20% test, 20% validation, 60% training samples from data
+        # No data found, so process it
+        # 20% test, 20% validation, 60% training samples from data
         splits = (0.2, 0.2, 0.6)
         # Only use certain columns
         use_cols = (  # 0, #PassengerID
@@ -283,31 +277,33 @@ if __name__ == "__main__":
                             11  # Embarked
         )
         # Convert certain columns to float values (so we can use numpy arrays)
-        converters = {4: lambda sex: {'male':0.0, 'female':1.0}[sex],
+        converters = {4: lambda sex: {'male': 0.0, 'female': 1.0}[sex],
                       11: lambda embarked: {'S': 0.0, 'C': 1.0, 'Q': 2.0}[embarked]}
         filter_missing = True
         data_processor.process_data(splits=splits, use_cols=use_cols, categorical_cols=categorical_cols,
                                     converters=converters, filter_missing=filter_missing)
 
-    # Extract training data, initialize neural network
+    # Extract training data
     (train_x, train_y) = (data_processor.training_X, data_processor.training_y)
     train_y = np.array([[0, 1] if train_y[i] == 1 else [1, 0] for i in range(len(train_y))])
-    # train_x = np.array([[i / 1000, 2 * i / 1000] for i in range(100)])
-    # train_y = np.array([[1, 0] if sum(train_x[i]) > 100 / 1000 else [0, 1] for i in range(100)])
     (valid_x, valid_y) = (data_processor.validation_X, data_processor.validation_y)
     valid_y = np.array([[0, 1] if valid_y[i] == 1 else [1, 0] for i in range(len(valid_y))])
-    print('Loading neural network...')
-    learner = FFNN(input_dimension=len(train_x[0]), output_dimension=len(train_y[0]))
 
     if mode == 'train':
-        err_accum = [0] * NUM_EPOCHS
-        for epoch in range(NUM_EPOCHS):
-            if verbose:
-                print(f"Beginning epoch {epoch+1}/{NUM_EPOCHS}")
-            do_learn()
-            err_accum[epoch], accuracy, ones, zeros = do_evaluate()
-            print(f"Epoch {epoch}/{NUM_EPOCHS}: {accuracy}/{len(train_x)} ({zeros}|{ones}); MSE={err_accum[epoch]}")
-
-        err_out = np.array(err_accum)
-        fname = f'results_h{HIDDEN_LAYER_SIZE}_e{NUM_EPOCHS}.txt'
-        np.savetxt(fname, err_out)
+        for HIDDEN_LAYER_SIZE in HIDDEN_LAYER_SIZES:
+            print('Loading neural network...')
+            FFNN_WEIGHTS_FILE = f'ffnn_weights_{HIDDEN_LAYER_SIZE}.npz'
+            learner = FFNN(input_dimension=len(train_x[0]), output_dimension=len(train_y[0]),
+                           hidden_layer_size=HIDDEN_LAYER_SIZE, weights_file=FFNN_WEIGHTS_FILE)
+            err_accum = [0] * NUM_EPOCHS
+            for epoch in range(NUM_EPOCHS):
+                if verbose:
+                    print(f"Beginning epoch {epoch+1}/{NUM_EPOCHS}")
+                do_learn()
+                err_accum[epoch], accuracy, ones, zeros = do_evaluate()
+                print(f"H={HIDDEN_LAYER_SIZE}, Epoch {epoch}/{NUM_EPOCHS}: {accuracy}/{len(train_x)} ({zeros}|{ones}); "
+                      f"MSE={err_accum[epoch]}")
+            mse_x = np.arange(NUM_EPOCHS)
+            err_out = np.array([[mse_x[i], err_accum[i]] for i in range(NUM_EPOCHS)])
+            fname = f'results_h{HIDDEN_LAYER_SIZE}_e{NUM_EPOCHS}.txt'
+            np.savetxt(fname, err_out)
