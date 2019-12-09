@@ -111,7 +111,7 @@ def gen_best_random_forest(train_X, train_y, valid_X, valid_y, verbose=False, sa
             cross_entropy = Metrics.cross_entropy(valid_proba[:, 0], valid_true_proba)
             cross_entropies.append(cross_entropy)
             if save_data:
-                trees_vs_xentropy.append([max_features, seed, cross_entropy])
+                trees_vs_xentropy.append([trees, seed, cross_entropy])
         avg_cross_entropy = np.mean(cross_entropies)
         if verbose:
             print(f"Trees:{trees}, Avg Cross Entropy:{avg_cross_entropy:.4f}")
@@ -180,7 +180,7 @@ if __name__ == "__main__":
     my_f_percent_correct = my_f_num_correct / len(my_f_predictions)
     print(f"{my_f_num_correct} / {len(my_f_predictions)}; Train Accuracy:{my_f_percent_correct:.4f}, Xentropy:{my_f_xentropy}")
     
-    skrf = ensemble.RandomForestClassifier(n_estimators=40, max_features=1)
+    skrf = ensemble.RandomForestClassifier(n_estimators=best_trees, max_features=best_max_features)
     skrf.fit(train_X, train_y)
     skrf_train_predictions = skrf.predict(valid_X)
     skrf_train_proba = skrf.predict_proba(valid_X)
