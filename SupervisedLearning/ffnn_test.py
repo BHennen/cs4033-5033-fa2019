@@ -6,11 +6,19 @@ import random as rand
 
 # Defines sequence of hidden layer sizes to run with
 HIDDEN_LAYER_SIZES = [10, 20, 50, 70, 100]
-LEARNING_RATE = 0.5
+MAX_LEARNING_RATE = 0.05
+LEARNING_RATE = MAX_LEARNING_RATE
+MAX_MOMENTUM_FACTOR = 0.75
+MOMENTUM_FACTOR = MAX_MOMENTUM_FACTOR
+MAX_MOMENTUM = 5
 
-NUM_EPOCHS = 1000
+NUM_EPOCHS = 250
 
 verbose = False
+
+
+def sigmoid(x):
+    return 1.0/(1.0 + np.exp(-x))
 
 
 class Neuron:
@@ -33,12 +41,9 @@ class Neuron:
         if len(x) != self.input_dimension:
             raise ValueError
         tsum = np.dot(self.w, x) + self.b
-        ret = self.activate(tsum)
+        ret = sigmoid(tsum)
         self.output = ret
         return ret
-
-    def activate(self, x):
-        return 1.0/(1.0 + np.exp(-x))
 
     def get_weights(self):
         t_weights = np.append(self.w, self.b)
@@ -115,33 +120,35 @@ class Layer:
 # Predictors used: columns 2, 5, 6, 7, 9
 class FFNN:
     def __init__(self, input_dimension, output_dimension,
-                 hidden_layer_size, weights_file, learning_rate=LEARNING_RATE):
+                 hidden_layer_size, weights_file):
         self.input_dim = input_dimension
         self.hidden_layer_size = hidden_layer_size
-        self.learning_rate = learning_rate
         self.output_dimension = output_dimension
-        file_weights = None
-        h_weights = None
-        o_weights = None
-        if os.path.exists(weights_file):
-            print('Importing FFNN weights from existing file...')
-            file_weights = np.load(FFNN_WEIGHTS_FILE)
-            h_weights = file_weights['arr_0']
-            o_weights = file_weights['arr_1']
-        else:
-            print("No FFNN weight file found, creating new FFNN.")
+        file_weights = np.load(FFNN_WEIGHTS_FILE) if os.path.exists(weights_file) else None
+        h1_weights = file_weights['arr_0'] if file_weights is not None else None
+        h2_weights = file_weights['arr_1'] if file_weights is not None else None
+        o_weights = file_weights['arr_2'] if file_weights is not None else None
 
         # Create output layer
         self.output_layer = Layer(input_dimension=hidden_layer_size, output_dimension=output_dimension,
                                   weights=o_weights, is_output=True, activation='sigmoid')
 
-        self.hidden_layer = Layer(input_dimension=input_dimension, output_dimension=hidden_layer_size,
-                                  weights=h_weights)
+        self.hidden_layer2 = Layer(input_dimension=hidden_layer_size, output_dimension=hidden_layer_size,
+                                   weights=h2_weights)
+
+        self.hidden_layer1 = Layer(input_dimension=input_dimension, output_dimension=hidden_layer_size,
+                                   weights=h1_weights)
+
+        # Momentum gradient storage
+        self.dw_o = np.zeros(shape=(self.output_layer.output_dimension, self.output_layer.input_dimension))
+        self.dw_h2 = np.zeros(shape=(self.hidden_layer2.output_dimension, self.hidden_layer2.input_dimension))
+        self.dw_h1 = np.zeros(shape=(self.hidden_layer1.output_dimension, self.hidden_layer1.input_dimension))
+        self.momentum = 0
 
     def predict(self, x):
         if len(x) != self.input_dim:
             raise ValueError
-        return self.output_layer.predict(self.hidden_layer.predict(x))
+        return self.output_layer.predict(self.hidden_layer2.predict(self.hidden_layer1.predict(x)))
 
     def train(self, x, target):
         if len(x) != self.input_dim:
@@ -149,10 +156,12 @@ class FFNN:
         if isinstance(target, (str, list, tuple, np.ndarray)) and len(target) != self.output_dimension:
             raise ValueError
 
-        # Output of hidden layer
-        o_input_h_output = [neuron.process_input(x) for neuron in self.hidden_layer.neurons]
+        # Output of first hidden layer
+        h2_input_h1_output = [neuron.process_input(x) for neuron in self.hidden_layer1.neurons]
+        # Output of second hidden layer
+        o_input_h2_output = [neuron.process_input(h2_input_h1_output) for neuron in self.hidden_layer2.neurons]
         # Output of output layer
-        o_output = self.output_layer.predict(o_input_h_output)
+        o_output = self.output_layer.predict(o_input_h2_output)
 
         # Output Gradient
         err_output_total = [0] * len(self.output_layer.neurons)
@@ -161,45 +170,107 @@ class FFNN:
             input_err = o_output[o] * (1 - o_output[o])
             err_output_total[o] = output_err * input_err
 
-        # Hidden Gradient
-        err_hidden_total = [0] * len(self.hidden_layer.neurons)
-        for h, h_neuron in enumerate(self.hidden_layer.neurons):
+        # Update momentum if needed
+        avg_error = sum(err_output_total) / len(err_output_total)
+        self.update_momentum(avg_error)
+
+        # Hidden2 Gradient
+        err_hidden2_total = [0] * len(self.hidden_layer2.neurons)
+        for h2, h_neuron in enumerate(self.hidden_layer2.neurons):
             dH = 0
             for o, o_neuron in enumerate(self.output_layer.neurons):
-                dH += err_output_total[o] * o_neuron.w[h]
+                dH += err_output_total[o] * o_neuron.w[h2]
 
-            err_hidden_total[h] = dH * o_input_h_output[h] * (1 - o_input_h_output[h])
+            err_hidden2_total[h2] = dH * o_input_h2_output[h2] * (1 - o_input_h2_output[h2])
+
+        # Hidden1 Gradient
+        err_hidden1_total = [0] * len(self.hidden_layer1.neurons)
+        for h2, h_neuron in enumerate(self.hidden_layer1.neurons):
+            dH = 0
+            for o, h2_neuron in enumerate(self.hidden_layer2.neurons):
+                dH += err_hidden2_total[o] * h2_neuron.w[h2]
+
+            err_hidden1_total[h2] = dH * h2_input_h1_output[h2] * (1 - h2_input_h1_output[h2])
 
         # Update output neurons
         for o, o_neuron in enumerate(self.output_layer.neurons):
             for w_ho in range(len(self.output_layer.neurons[o].w)):
-                err_weight = err_output_total[o] * o_input_h_output[w_ho]
-                dw = LEARNING_RATE * err_weight
+                # Compute dw
+                err_weight = err_output_total[o] * o_input_h2_output[w_ho]
+                tdw = LEARNING_RATE * err_weight
+
+                # Add momentum to dw
+                dw = tdw
+                if self.dw_o is not None:
+                    dw += MOMENTUM_FACTOR*self.dw_o[o][w_ho]
+
+                # Update momentum matrix
+                self.dw_o[o][w_ho] += tdw
+
                 o_neuron.w[w_ho] -= dw
 
         # Update hidden neurons
-        for h, h_neuron in enumerate(self.hidden_layer.neurons):
-            for w_ih in range(len(self.hidden_layer.neurons[h].w)):
-                err_weight = err_hidden_total[h] * x[w_ih]
-                dw = self.learning_rate * err_weight
+        for h2, h_neuron in enumerate(self.hidden_layer2.neurons):
+            for w_ih in range(len(self.hidden_layer2.neurons[h2].w)):
+                # Find dw
+                err_weight = err_hidden2_total[h2] * h2_input_h1_output[w_ih]
+                tdw = LEARNING_RATE * err_weight
+
+                # Add momentum to dw
+                dw = tdw
+                if self.dw_h2 is not None:
+                    dw += MOMENTUM_FACTOR*self.dw_h2[h2][w_ih]
+
+                # Update momentum matrix
+                self.dw_h2[h2][w_ih] += tdw
+
+                h_neuron.w[w_ih] -= dw
+
+        for h1, h_neuron in enumerate(self.hidden_layer1.neurons):
+            for w_ih in range(len(self.hidden_layer1.neurons[h1].w)):
+                err_weight = err_hidden1_total[h1] * x[w_ih]
+                tdw = LEARNING_RATE * err_weight
+                # Add momentum to dw
+                dw = tdw
+                if self.dw_h1 is not None:
+                    dw += MOMENTUM_FACTOR*self.dw_h1[h1][w_ih]
+                # Update momentum matrix
+                self.dw_h1[h1][w_ih] += tdw
+
                 h_neuron.w[w_ih] -= dw
 
         return
 
-    def print_weights(self):
-        for i, h_neuron in enumerate(self.hidden_layer.neurons):
-            print(f"H{i}. {str(h_neuron.w)}, {str(h_neuron.b)}")
+    def update_momentum(self, avg_error):
+        # Trending positive
+        if avg_error >= 0 and self.momentum >= 0:
+            self.momentum += 1
+        # Trending negative
+        elif avg_error < 0 and self.momentum <= 0:
+            self.momentum -= 1
+        # Error is opposite of momentum
+        else:
+            # Too strong momentum -> reset momentum values
+            if abs(self.momentum) > MAX_MOMENTUM:
+                self.momentum = 0
+                self.dw_h1 = np.zeros(shape=(self.hidden_layer1.output_dimension, self.hidden_layer1.input_dimension))
+                self.dw_h2 = np.zeros(shape=(self.hidden_layer2.output_dimension, self.hidden_layer2.input_dimension))
+                self.dw_o = np.zeros(shape=(self.output_layer.output_dimension, self.output_layer.input_dimension))
+            # Reasonable momentum -> continue
+            else:
+                self.momentum += 1 if avg_error >= 0 else -1
 
     def export_weights(self):
-        h_weights = np.array([n.get_weights() for n in self.hidden_layer.neurons])
+        h1_weights = np.array([n.get_weights() for n in self.hidden_layer1.neurons])
+        h2_weights = np.array([n.get_weights() for n in self.hidden_layer2.neurons])
         o_weights = np.array([n.get_weights() for n in self.output_layer.neurons])
-        np.savez(FFNN_WEIGHTS_FILE, h_weights, o_weights)
+        np.savez(FFNN_WEIGHTS_FILE, h1_weights, h2_weights, o_weights)
 
 
-def do_learn():
+def do_learn(tindices):
     global learner, train_x, train_y
-    for i, train_xi in enumerate(train_x):
-        learner.train(train_xi, train_y[i])
+    for idx in tindices:
+        learner.train(train_x[idx], train_y[idx])
     if verbose:
         learner.print_weights()
     learner.export_weights()
@@ -289,6 +360,11 @@ if __name__ == "__main__":
     (valid_x, valid_y) = (data_processor.validation_X, data_processor.validation_y)
     valid_y = np.array([[0, 1] if valid_y[i] == 1 else [1, 0] for i in range(len(valid_y))])
 
+    # Easy data for performance comparison
+    if 'easydata' in sys.argv:
+        train_x = np.array([[i/1000, 2*i/1000] for i in range(100)])
+        train_y = np.array([(train_x[i][0] + train_x[i][1])/1000 for i in range(100)])
+
     if mode == 'train':
         for HIDDEN_LAYER_SIZE in HIDDEN_LAYER_SIZES:
             print('Loading neural network...')
@@ -296,14 +372,23 @@ if __name__ == "__main__":
             learner = FFNN(input_dimension=len(train_x[0]), output_dimension=len(train_y[0]),
                            hidden_layer_size=HIDDEN_LAYER_SIZE, weights_file=FFNN_WEIGHTS_FILE)
             err_accum = [0] * NUM_EPOCHS
+            indices = [i for i in range(len(train_x))]
             for epoch in range(NUM_EPOCHS):
+                # Shuffle indices
+                rand.shuffle(indices)
+                # Setup hyperparameters
+                epoch_grad_coef = (NUM_EPOCHS - epoch)/NUM_EPOCHS
+                MOMENTUM_FACTOR = MAX_MOMENTUM_FACTOR * epoch_grad_coef
+                LEARNING_RATE = MAX_LEARNING_RATE * epoch_grad_coef
                 if verbose:
                     print(f"Beginning epoch {epoch+1}/{NUM_EPOCHS}")
-                do_learn()
+                do_learn(indices)
                 err_accum[epoch], accuracy, ones, zeros = do_evaluate()
-                print(f"H={HIDDEN_LAYER_SIZE}, Epoch {epoch}/{NUM_EPOCHS}: {accuracy}/{len(train_x)} ({zeros}|{ones}); "
+                print(f"H={HIDDEN_LAYER_SIZE}, Epoch {epoch}/{NUM_EPOCHS}: {accuracy}/{len(valid_x)} ({zeros}|{ones}); "
                       f"MSE={err_accum[epoch]}")
-            mse_x = np.arange(NUM_EPOCHS)
-            err_out = np.array([[mse_x[i], err_accum[i]] for i in range(NUM_EPOCHS)])
-            fname = f'results_h{HIDDEN_LAYER_SIZE}_e{NUM_EPOCHS}.txt'
+            # Deprecated: (epoch, mse) format
+            # mse_x = np.arange(NUM_EPOCHS)
+            # err_out = np.array([[mse_x[i], err_accum[i]] for i in range(NUM_EPOCHS)])
+            err_out = err_accum
+            fname = f'results\\results_h{HIDDEN_LAYER_SIZE}_e{NUM_EPOCHS}.txt'
             np.savetxt(fname, err_out)
