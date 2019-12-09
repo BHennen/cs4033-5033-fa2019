@@ -74,12 +74,13 @@ if 'train' in sys.argv:
     ax = fig.add_subplot(111)
     ax.set_ylabel('mse')
     ax.set_xlabel('epoch')
-    ax.set_title('Keras model (easy data, 1-hidden)')
+    ax.set_title('Keras model (2-hidden)')
 
     for idx_size, hidden_layer_size in enumerate(hidden_layer_sizes):
 
         # init NN
         model = Sequential()
+        model.add(Dense(hidden_layer_size, input_dim=input_dimension, activation='sigmoid'))
         model.add(Dense(hidden_layer_size, input_dim=input_dimension, activation='sigmoid'))
         model.add(Dense(output_dimension, activation='sigmoid'))
 
