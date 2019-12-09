@@ -239,19 +239,22 @@ class Metrics():
         POD_arr.append(1)
         POFD_arr.append(1)
 
-        # # Sort by POFD_arr in ascending order
-        # data = list(zip(POFD_arr, POD_arr))
-        # data.sort()  
         return POFD_arr, POD_arr
     
     @staticmethod
-    def add_ROC_curve(POFD_arr, POD_arr, label, color, include_AUC=True):
+    def add_ROC_curve(calc_proba, true_proba, label, color, include_AUC=True):
         ''' Plot ROC curve
         
             Does not display curve until show_roc_curve is called.
 
             Parameters
             ----------
+            calc_proba : 1d numpy array of floats from [0.0-1.0]
+                Calculated probabilities where each row in calc_proba is the probability that the datum is part of a class.
+
+            true_proba : 1d numpy array of floats from [0.0-1.0]
+                True probabilities where each row in true_proba is the true probability that the datum is part of a class. 
+
             label : String
 
             color : Color
@@ -259,10 +262,15 @@ class Metrics():
             include_AUC : Boolean
                 Whether or not to include the area under the curve as part of the label.
 
+            Returns
+            -------
+            If include_AUC, returns area under curve, otherwise returns None.
+
         '''
+        raw_POFD_arr, raw_POD_arr = Metrics.get_ROC_data(calc_proba, true_proba)
 
         # Sort by POFD values in ascending order
-        POFD_arr, POD_arr = zip(*sorted(zip(POFD_arr, POD_arr)))
+        POFD_arr, POD_arr = zip(*sorted(zip(raw_POFD_arr, raw_POD_arr)))
 
         # Calculate area under curve
         AUC = None
