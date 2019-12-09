@@ -2,7 +2,59 @@ import os
 import numpy as np
 from csv import reader
 import matplotlib.pyplot as plt
+import pickle
 
+
+class ModelProcessor():
+    def __init__(self, cur_path, model_folder_name, model_name):
+        self.model_name = model_name
+        self.model_folder_path = os.path.join(cur_path, model_folder_name + "\\" + model_name)
+        if not os.path.exists(self.model_folder_path):
+            os.makedirs(self.model_folder_path)
+        self.model_path = os.path.join(self.model_folder_path, model_name + "_model.pkl")
+        self.parameter_path = os.path.join(self.model_folder_path, model_name + "_parameters.npz")
+
+    def load_model(self, model_path=None):
+        if model_path is None:
+            model_path = self.model_path
+        # Load already trained model
+        if os.path.exists(model_path):
+            print(f"Loading model from: {model_path}")
+            with open(model_path, 'rb') as model_file:
+                model = pickle.load(model_file)
+                return model
+        else:
+            raise FileNotFoundError(f"No model at path: {model_path}")
+    
+    def save_model(self, model, model_path=None):
+        if model_path is None:
+            model_path = self.model_path
+        # Save model
+        with open(model_path, 'wb') as model_file:
+            print(f"Saving model to: {model_path}")
+            pickle.dump(model, model_file, pickle.HIGHEST_PROTOCOL)
+    
+    def load_parameters(self, param_list, parameter_path=None):
+        if parameter_path is None:
+            parameter_path = self.parameter_path
+        if os.path.exists(parameter_path):
+            with np.load(parameter_path) as params:
+                return [params[param] for param in param_list]
+        else:
+            raise FileNotFoundError(f"No parameters at path: {parameter_path}")
+
+    def save_parameters(self, parameter_path=None, **kwargs):
+        if parameter_path is None:
+            parameter_path = self.parameter_path
+        np.savez(parameter_path, **kwargs)
+
+    def save_results(self, results_data, results_header):
+        for key, value in results_data.items():
+            header = ''
+            if key in results_header:
+                header = results_header[key]
+            results_path = os.path.join(self.model_folder_path, self.model_name + "_" + key + ".txt")
+            np.savetxt(results_path, value, delimiter=',', header=header)
 
 class DataProcessor():
 
@@ -335,3 +387,13 @@ class Metrics():
             prev_y = y_val
 
         return tot_area
+
+    @staticmethod
+    def cross_entropy(calc_proba, true_proba, eps=1e-15):
+        # Formula: -(yt log(yp) + (1 - yt) log(1 - yp))
+        # Make sure 0<p<1 to avoid division by 0 in log
+        calc_proba = np.clip(calc_proba, eps, 1 - eps)
+        true_proba = np.clip(true_proba, eps, 1 - eps)
+        sample_entropy = -(true_proba * np.log(calc_proba) + (1 - true_proba) * np.log(1 - calc_proba))
+        cross_entropy = np.mean(sample_entropy)
+        return cross_entropy

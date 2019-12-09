@@ -2,3 +2,4 @@
 .env
 __pycache__/
 *.npz
+trained_models/
