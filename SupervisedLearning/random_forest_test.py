@@ -147,8 +147,9 @@ if __name__ == "__main__":
 
     best_forest = None
     try:
-        best_forest = model_processor.load_model()
-        best_trees, best_max_features = model_processor.load_parameters(["best_trees", "best_max_features"])
+        # best_forest = model_processor.load_model()
+        best_trees, best_max_features = (75, 1)
+        # FIXME: best_trees, best_max_features = model_processor.load_parameters(["best_trees", "best_max_features"])
     except FileNotFoundError:
         best_forest, best_trees, best_max_features, results = gen_best_random_forest(train_X, train_y, valid_X, valid_y, verbose=True, save_data=True)
         model_processor.save_model(best_forest)
@@ -166,30 +167,35 @@ if __name__ == "__main__":
     # Metrics.compare_models(model1, model2, test_X, test_Y)
         
     #Get probability for being the lowest unique value in y (basically 1 if it is lowest unique value, 0 if it isnt)
-    unique_y = np.unique(valid_y)
-    y_true_proba = np.array([1 if y_elem == unique_y[0] else 0 for y_elem in valid_y])
+    unique_y = np.unique(test_y)
+    y_true_proba = np.array([1 if y_elem == unique_y[0] else 0 for y_elem in test_y])
 
-    # Forest should already be fit with data, but we'll do it again anyway
-    best_forest.fit(train_X, train_y)
+    bf_percents = []
+    sk_percents = []
+    # Fit random forest 30 times and record accuracy
+    for _ in range(30):
+        bf = RandomForestClassifier(n_estimators=best_trees, max_features=best_max_features)
+        bf.fit(train_X, train_y)
+        bf_pred = bf.predict(test_X)
+        bf_correct = np.sum(np.equal(bf_pred, test_y))
+        bf_percent = bf_correct / len(bf_pred)
+        bf_percents.append(bf_percent)
 
-    # 
-    my_f_predictions = best_forest.predict(valid_X)
-    my_f_proba = best_forest.predict_proba(valid_X)
-    my_f_xentropy = Metrics.cross_entropy(my_f_proba[:, 0], y_true_proba)
-    my_f_num_correct = np.sum(np.equal(my_f_predictions, valid_y))
-    my_f_percent_correct = my_f_num_correct / len(my_f_predictions)
-    print(f"{my_f_num_correct} / {len(my_f_predictions)}; Train Accuracy:{my_f_percent_correct:.4f}, Xentropy:{my_f_xentropy}")
+        sk = ensemble.RandomForestClassifier(n_estimators=best_trees, max_features=best_max_features)
+        sk.fit(train_X, train_y)
+        sk_pred = sk.predict(test_X)
+        sk_correct = np.sum(np.equal(sk_pred, test_y))
+        sk_percent = sk_correct / len(sk_pred)
+        sk_percents.append(sk_percent)
     
-    skrf = ensemble.RandomForestClassifier(n_estimators=best_trees, max_features=best_max_features)
-    skrf.fit(train_X, train_y)
-    skrf_train_predictions = skrf.predict(valid_X)
-    skrf_train_proba = skrf.predict_proba(valid_X)
-    skrf_train_xentropy = Metrics.cross_entropy(skrf_train_proba[:, 0], y_true_proba)
-    skrf_train_num_correct = np.sum(np.equal(skrf_train_predictions, valid_y))
-    skrf_train_percent_correct = skrf_train_num_correct / len(skrf_train_predictions)
-    print(f"{skrf_train_num_correct} / {len(skrf_train_predictions)}; SKRF Train Accuracy:{skrf_train_percent_correct:.4f}, Xentropy:{skrf_train_xentropy}")
+    bf_mean_acc = np.mean(bf_percents)
+    bf_sd_acc = np.std(bf_percents)
+    sk_mean_acc = np.mean(sk_percents)
+    sk_sd_acc = np.std(sk_percents)
 
-    Metrics.add_ROC_curve(my_f_proba[:, 0], y_true_proba, f"my rf -", color="g")
-    Metrics.add_ROC_curve(skrf_train_proba[:, 0], y_true_proba, f"sklearn rf -", color="r")
-    Metrics.show_ROC_curve("aiosjdfoais")
+    print(f"bf_mean_acc:{bf_mean_acc}, bf_sd_acc:{bf_sd_acc}, sk_mean_acc:{sk_mean_acc}, sk_sd_acc:{sk_sd_acc}")
+
+    # Metrics.add_ROC_curve(my_f_proba[:, 0], y_true_proba, f"Our Random Forest -", color="g")
+    # Metrics.add_ROC_curve(skrf_train_proba[:, 0], y_true_proba, f"Scikit-learn Random Forest -", color="r")
+    # Metrics.show_ROC_curve("")
 

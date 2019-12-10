@@ -35,11 +35,13 @@ class ModelProcessor():
             pickle.dump(model, model_file, pickle.HIGHEST_PROTOCOL)
     
     def load_parameters(self, param_list, parameter_path=None):
+        #FIXME: doesn't work, have to manually save and set params
         if parameter_path is None:
             parameter_path = self.parameter_path
         if os.path.exists(parameter_path):
             with np.load(parameter_path) as params:
-                return [params[param] for param in param_list]
+                my_params = [params[param] for param in param_list]
+                return my_params
         else:
             raise FileNotFoundError(f"No parameters at path: {parameter_path}")
 
