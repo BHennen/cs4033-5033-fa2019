@@ -1,8 +1,8 @@
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.models import Sequential
-# from keras.models import Sequential
+# from keras.models import Sequential # Note: included for debug source access
 from tensorflow.keras.layers import Dense
-# from keras.layers import Dense
+# from keras.layers import Dense # Note: included for debug source access
 import os
 import numpy as np
 import sys
@@ -67,14 +67,8 @@ if 'train' in sys.argv:
     # Set NN params
     input_dimension = len(train_x[0])
     output_dimension = len(train_y[0]) if isinstance(train_y[0], (str, list, tuple, np.ndarray)) else 1
-    NUM_EPOCHS = 250
+    NUM_EPOCHS = 100
     hidden_layer_sizes = [10, 20, 50, 70, 100]
-    handles = [None] * len(hidden_layer_sizes)
-    fig = pyplot.figure("CS 4033/5033 - Hennen/Bost")
-    ax = fig.add_subplot(111)
-    ax.set_ylabel('mse')
-    ax.set_xlabel('epoch')
-    ax.set_title('Keras model (2-hidden)')
 
     for idx_size, hidden_layer_size in enumerate(hidden_layer_sizes):
 
@@ -90,10 +84,7 @@ if 'train' in sys.argv:
         history = model.fit(train_x, train_y, epochs=NUM_EPOCHS, validation_split=0,
                             validation_data=(valid_x, valid_y), verbose=2)
 
+        # Export metrics
         mse_data = history.history['val_mse']
-        handles[idx_size] = pyplot.plot(mse_data, label=f"H={hidden_layer_size}")
-
-        _, accuracy, mse = model.evaluate(train_x, train_y)
-
-    pyplot.legend()
-    pyplot.show()
+        accuracies = history.history['val_accuracy']
+        np.savez(f'results\\keras_h{hidden_layer_size}', mse_data, accuracies)

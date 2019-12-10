@@ -12,7 +12,7 @@ MAX_MOMENTUM_FACTOR = 0.75
 MOMENTUM_FACTOR = MAX_MOMENTUM_FACTOR
 MAX_MOMENTUM = 5
 
-NUM_EPOCHS = 250
+NUM_EPOCHS = 100
 
 verbose = False
 
@@ -21,6 +21,7 @@ def sigmoid(x):
     return 1.0/(1.0 + np.exp(-x))
 
 
+# Neuron for a neural network. Summation Unit. Sigmoid activation.
 class Neuron:
     def __init__(self, input_dimension, weights=None, activation='sigmoid'):
         self.input_dimension = input_dimension
@@ -49,10 +50,8 @@ class Neuron:
         t_weights = np.append(self.w, self.b)
         return t_weights
 
-    # def get_error_total(self, target):
-    #     return -(target - self.output) * self.output * (1 - self.output)
 
-
+# Layer of neurons
 class Layer:
     def __init__(self, input_dimension, output_dimension, weights=None, activation='sigmoid', is_input=False,
                  is_output=False):
@@ -76,43 +75,6 @@ class Layer:
             raise ValueError
         return [neuron.process_input(x) for neuron in self.neurons]
 
-    def train(self, x, y_target):
-        if not isinstance(y_target, (str, list, tuple, np.ndarray)):
-            y_target = [y_target]
-        if len(x) != self.input_dimension:
-            raise ValueError
-        if self.is_output and len(y_target) != self.output_dimension:
-            raise ValueError
-
-        Y = self.predict(x)
-
-        if self.is_output:
-            next_gradient = [0] * self.output_dimension
-            loss = self.get_loss(y_target, Y)
-            for i in range(self.output_dimension):
-                next_gradient[i] = LEARNING_RATE * -loss
-        else:
-            next_gradient = self.next_layer.train(Y, y_target)
-
-        this_gradient = np.zeros(self.input_dimension)
-        for i_neuron, neuron in enumerate(self.neurons):
-            # Layer output error - derivative of MSE
-            y_gradient = (1.0 - Y[i_neuron]) * Y[i_neuron]
-            error_i = next_gradient[i_neuron] * y_gradient if self.loss == 'absolute' else Y[i_neuron]
-
-            # Store neuron weights before updating
-            W = np.copy(neuron.w)
-
-            # dW_i = e_i * x_i
-            dW = error_i * np.array(x)
-            dBias_Y = error_i * neuron.BIAS
-            neuron.update_weights(dW, dBias_Y)
-
-            # Update gradient
-            for i_input in range(self.input_dimension):
-                this_gradient[i_input] += error_i * W[i_input]
-        return this_gradient
-
     def process_input(self, x):
         return self.predict(x)
 
@@ -133,7 +95,7 @@ class FFNN:
         self.output_layer = Layer(input_dimension=hidden_layer_size, output_dimension=output_dimension,
                                   weights=o_weights, is_output=True, activation='sigmoid')
 
-        self.hidden_layer2 = Layer(input_dimension=hidden_layer_size, output_dimension=hidden_layer_size,
+        self.hidden_layer2 = Layer(input_dimension=input_dimension, output_dimension=hidden_layer_size,
                                    weights=h2_weights)
 
         self.hidden_layer1 = Layer(input_dimension=input_dimension, output_dimension=hidden_layer_size,
@@ -142,13 +104,13 @@ class FFNN:
         # Momentum gradient storage
         self.dw_o = np.zeros(shape=(self.output_layer.output_dimension, self.output_layer.input_dimension))
         self.dw_h2 = np.zeros(shape=(self.hidden_layer2.output_dimension, self.hidden_layer2.input_dimension))
-        self.dw_h1 = np.zeros(shape=(self.hidden_layer1.output_dimension, self.hidden_layer1.input_dimension))
+        # self.dw_h1 = np.zeros(shape=(self.hidden_layer1.output_dimension, self.hidden_layer1.input_dimension))
         self.momentum = 0
 
     def predict(self, x):
         if len(x) != self.input_dim:
             raise ValueError
-        return self.output_layer.predict(self.hidden_layer2.predict(self.hidden_layer1.predict(x)))
+        return self.output_layer.predict(self.hidden_layer2.predict(x))#(self.hidden_layer1.predict(x)))
 
     def train(self, x, target):
         if len(x) != self.input_dim:
@@ -373,6 +335,7 @@ if __name__ == "__main__":
                            hidden_layer_size=HIDDEN_LAYER_SIZE, weights_file=FFNN_WEIGHTS_FILE)
             err_accum = [0] * NUM_EPOCHS
             indices = [i for i in range(len(train_x))]
+            accuracies = np.zeros(shape=(NUM_EPOCHS,))
             for epoch in range(NUM_EPOCHS):
                 # Shuffle indices
                 rand.shuffle(indices)
@@ -383,12 +346,12 @@ if __name__ == "__main__":
                 if verbose:
                     print(f"Beginning epoch {epoch+1}/{NUM_EPOCHS}")
                 do_learn(indices)
-                err_accum[epoch], accuracy, ones, zeros = do_evaluate()
-                print(f"H={HIDDEN_LAYER_SIZE}, Epoch {epoch}/{NUM_EPOCHS}: {accuracy}/{len(valid_x)} ({zeros}|{ones}); "
+                err_accum[epoch], accuracies[epoch], ones, zeros = do_evaluate()
+                print(f"H={HIDDEN_LAYER_SIZE}, Epoch {epoch}/{NUM_EPOCHS}: {accuracies[epoch] / len(valid_x)} ({zeros}|{ones}); "
                       f"MSE={err_accum[epoch]}")
             # Deprecated: (epoch, mse) format
             # mse_x = np.arange(NUM_EPOCHS)
             # err_out = np.array([[mse_x[i], err_accum[i]] for i in range(NUM_EPOCHS)])
             err_out = err_accum
-            fname = f'results\\results_h{HIDDEN_LAYER_SIZE}_e{NUM_EPOCHS}.txt'
-            np.savetxt(fname, err_out)
+            fname = f'results\\results_h{HIDDEN_LAYER_SIZE}_e{NUM_EPOCHS}.npz'
+            np.savez(fname, err_out, accuracies)
